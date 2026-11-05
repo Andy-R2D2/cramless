@@ -1,0 +1,18 @@
+# Secrets (OpenAI key)
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Local database and uploaded lectures
+cramless.db
+uploads/*
+!uploads/.gitkeep
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

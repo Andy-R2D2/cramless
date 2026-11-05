@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- Role 1: homepage. Every other page goes in this templates/ folder too. -->
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <title>Cramless</title>
+</head>
+<body>
+  <!-- Language switch: calls the /language/<lang> route in app.py -->
+  <a href="/language/en">EN</a> | <a href="/language/fr">FR</a>
+
+  <h1>Cramless</h1>
+  <p>{{ t.welcome }}</p>
+
+  <!-- Sample readiness score (fixed demo data from app.py) -->
+  <h2>Sample readiness: {{ sample_score }}/100</h2>
+  <p><strong>Tip:</strong> {{ tip }}</p>
+
+  <a href="/register">Register</a> · <a href="/login">Log in</a>
+  <!-- TODO (Role 1): add CSS and make it look good -->
+</body>
+</html>

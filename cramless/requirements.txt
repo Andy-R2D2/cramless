@@ -1,0 +1,8 @@
+# Web server (also installs werkzeug, used for password hashing)
+Flask>=3.0
+# Reads the OpenAI key from the .env file
+python-dotenv>=1.0
+# PDF pages -> images
+PyMuPDF>=1.24
+# AI summaries and flashcards
+openai>=1.40
