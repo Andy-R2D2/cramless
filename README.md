@@ -16,7 +16,7 @@ There are 4 of us, so the project is split into **4 roles**. Each role owns its 
 
 | Role | Files you own | Owner |
 |---|---|---|
-| **1. Website, accounts, dashboard & EN/FR** | `app.py`, `auth.py`, `templates/`, `static/` | _your name_ |
+| **1. Website, accounts, dashboard & EN/FR** | `app.py`, `auth.py`, `templates/`, `static/` | Meron |
 | **2. Courses, lectures & AI** | `courses.py`, `ai_generator.py` | _your name_ |
 | **3. Planner: exams, timetable, goals, daily plan, timer** | `planner.py` | Teni|
 | **4. Readiness score & reminders** | `readiness.py` | _your name_ |
