@@ -5,18 +5,76 @@
   <meta charset="utf-8">
   <title>Cramless</title>
 </head>
+
+
 <body>
-  <!-- Language switch: calls the /language/<lang> route in app.py -->
-  <a href="/language/en">EN</a> | <a href="/language/fr">FR</a>
 
-  <h1>Cramless</h1>
-  <p>{{ t.welcome }}</p>
+  <div class="top-row">
+      
+    <div class="language-switch">
+      <!-- Language switch: calls the /language/<lang> route in app.py -->
+      <a href="/language/en">EN</a> / <a href="/language/fr">FR</a>
+    </div>
 
-  <!-- Sample readiness score (fixed demo data from app.py) -->
-  <h2>Sample readiness: {{ sample_score }}/100</h2>
-  <p><strong>Tip:</strong> {{ tip }}</p>
+    <div class="auth-links">
+      <a href="/register">Register</a> / <a href="/login">Login</a>
+    </div>
+    
+  </div>
 
-  <a href="/register">Register</a> · <a href="/login">Log in</a>
+  <div class="background">
+    <h1 style="color: black;">Cramless</h1>
+    <p>{{ t.welcome }}</p>
+
+    <!-- Sample readiness score (fixed demo data from app.py) -->
+    <h2>Sample readiness: {{ sample_score }}/100</h2>
+
+    <div class="tip-box">
+      <p><strong>Tip:</strong> {{ tip }}</p>
+    </div>
+    
+  </div>  
+  
   <!-- TODO (Role 1): add CSS and make it look good -->
 </body>
 </html>
+
+
+<style>
+
+  body {
+    margin: 0; 
+    background-color: rgb(161, 227, 255);
+  }
+
+  .background {
+    text-align: center;
+    margin-top: 5rem;
+  }
+
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: rgb(41, 126, 244);
+    padding: 1rem 2rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .language-switch a, .auth-links a {
+    color: white;
+  }
+
+
+  .tip-box {
+    margin-top: 2rem;
+    background-color: rgb(255, 255, 255);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 2px solid black;
+    display: inline-block;
+  }
+
+  
+</style>
