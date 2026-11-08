@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<head>  
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+</head>
+
+
+<body>
+
+    <div class="top-row">
+        <a href="/language/en" style="color: white;">EN</a>  <a href="/language/fr" style="color: white;">FR</a>
+    </div>
+
+    <div class="register-wrapper">
+
+        <div class="register-card">
+                
+            <h1>Register</h1>
+
+            {% if error %}
+                <p style="color:red;">{{ error }}</p>
+            {% endif %}
+
+            <form id="registerform" method="POST" action="/register">
+
+                <div class="form-row">
+                    <label for="email">Email: </label>
+                    <input type="email" id="email" name="email" required />
+                </div>
+                
+        
+                <div class="form-row">
+                    <label for="password">Password: </label>
+                    <input type="password" id="password" name="password" required />
+                </div>
+                
+
+                <div class="form-row">
+                    <label for="password">Confirm Password: </label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required />
+                </div>
+                
+
+                <button type="submit">Register</button>
+            </form>
+        
+            <p class="signin-link">
+                Existing user?
+                <a href="/login">Sign In</a>
+            </p>
+        </div>
+    </div>
+</body>
+
+
+
+<style>
+
+    .top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: rgb(41, 126, 244);
+        padding: 1rem 2rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .register-wrapper {
+        display: flex;
+        padding: 10px 40px 10px 40px; /* top right bottom left */
+        justify-content: center;
+        align-items: center;
+        height: 90vh;
+        background-color: rgb(180, 232, 255);
+    }
+
+    .register-card {
+        background-color: #fff;
+        padding: 10px 40px 10px 40px; /* top right bottom left */
+        align-items: center;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(112, 101, 101, 0.1);
+        width: 350px;
+    }
+
+    input[type="email"], input[type="password"] { /* adds space between each input field and the button */
+        margin-bottom: 1rem;
+    }
+
+    .form-row {
+        margin-right: 1rem;
+    }
+
+</style>
+
+</html>

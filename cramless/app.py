@@ -81,7 +81,17 @@ def register():
     """Create an account (#2).
     TODO (Role 1): create templates/register.html with an email + password form."""
     if request.method == "POST":
+
+        password = request.form["password"]
+        confirmPassword = request.form["confirmPassword"]
+        if confirmPassword != password:
+            return render_template("register.html", error="Passwords do not match.")
+
+        
         user_id = auth.register_user(request.form["email"], request.form["password"])
+
+        
+
         if user_id:
             session["user_id"] = user_id
             return redirect(url_for("dashboard"))
