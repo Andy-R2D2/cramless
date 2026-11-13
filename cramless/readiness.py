@@ -8,6 +8,7 @@ Each part is a percentage from 0 to 100. Everything here is rule-based.
 """
 
 from database import get_connection
+from datetime import date, timedelta
 
 WEIGHTS = {
     "mastery": 0.35,      # % of flashcards known
@@ -61,8 +62,34 @@ def coverage(course_id):
 
 
 def adherence(course_id):
-    """TODO (Role 4): minutes studied this week / minutes planned this week (max 100)."""
-    return 0
+    """% of this week;s planned minutes actually studied for this course (max 100).
+    Planned = daily goals for Monday...today, split evenly across the student's courses."""
+    conn = get_connection()
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+
+    course = conn.execute("SELECT user_id FROM courses WHERE id = ?", (course_id,)).fetchone()
+    if not course:
+        conn.close()
+        return 0
+    user_id = course["user_id"]
+
+    n_courses = conn.execute(
+        "SELECT COUNT(*) AS n FROM courses WHERE user_id = ?", (user_id,)
+    ).fetchone()["n"]
+
+    planned_hours = conn.execute(
+        "SELECT COALESCE(SUM(hours), 0) AS h FROM daily_goals WHERE user_id = ? AND weekday <= ?",
+        (user_id, today.weekday()),
+    ).fetchone()["h"]
+    planned_minutes = planned_hours * 60 / n_courses
+
+    done = conn.execute(
+        "SELECT COALESCE(SUM(minutes), 0) AS m FROM study_sessions WHERE course_id = ? AND study_date >= ?",
+        (course_id, monday.isoformat()),
+    ).fetchone()["m"]
+    conn.close()
+    return min(100, percent(done, planned_minutes))
 
 
 def consistency(course_id):
