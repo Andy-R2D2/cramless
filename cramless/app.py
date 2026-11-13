@@ -134,6 +134,13 @@ def dashboard():
         scores=readiness.all_scores(user_id),
     )
 
+@app.route("/readiness")
+def readiness_page():
+    """Readiness score per course (#13): score, band and tip. Role 4."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    return render_template("readiness.html", scores=readiness.all_scores(user_id))
 
 # TODO (Role 1, with each role): add the remaining pages here, for example:
 #   /courses                     -> list + add courses           (Role 2)
@@ -142,7 +149,7 @@ def dashboard():
 #   /lecture/<id>/flashcards     -> flashcard review              (Role 2)
 #   /setup                       -> exams, timetable, daily goals (Role 3)
 #   /plan                        -> today's plan + timer          (Role 3)
-#   /readiness                   -> score per course              (Role 4)
+#   /readiness                   -> score per course              (Role 4)✅
 # Each route should: check login, call ONE function from that role's file,
 # then render_template(...).
 

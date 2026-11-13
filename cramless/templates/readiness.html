@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- Role 4: readiness score per course (#13, #14) -->
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <title>Cramless - Readiness</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; background: rgb(161, 227, 255); }
+    .card { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; max-width: 500px; }
+    .score { font-size: 2rem; font-weight: bold; }
+    .band { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; color: white; }
+    .b0 { background: #c0392b; } .b1 { background: #e67e22; } .b2 { background: #f1c40f; }
+    .b3 { background: #27ae60; } .b4 { background: #1e8449; }
+  </style>
+</head>
+<body>
+  <a href="/dashboard">&larr; Dashboard</a>
+  <h1>Readiness</h1>
+  {% if not scores %}<p>Add a course to see your readiness score.</p>{% endif %}
+  {% for s in scores %}
+  <div class="card">
+    <h2>{{ s.course_code }}</h2>
+    <div class="score">{{ s.score }}/100</div>
+    <span class="band b{{ (s.score // 20) if s.score < 100 else 4 }}">{{ s.band }}</span>
+    <p><strong>Tip:</strong> {{ s.tip }}</p>
+  </div>
+  {% endfor %}
+</body>
+</html>
