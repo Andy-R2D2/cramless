@@ -122,16 +122,20 @@ def freshness(course_id):
 # ---------------------------------------------------------------------------
 # Final score
 # ---------------------------------------------------------------------------
-
-def course_score(course_id):
-    """The 0-100 readiness score for one course."""
-    parts = {
+def course_parts(course_id):
+    """The 5 parts of the sore, each 0-100."""
+    return {
         "mastery": mastery(course_id),
         "adherence": adherence(course_id),
         "consistency": consistency(course_id),
         "freshness": freshness(course_id),
         "coverage": coverage(course_id),
     }
+
+
+def course_score(course_id):
+    """The 0-100 readiness score for one course."""
+    parts = course_parts(course_id)
     return round(sum(WEIGHTS[name] * value for name, value in parts.items()))
 
 
@@ -147,8 +151,10 @@ def band(score):
 
 
 def weakest_tip(course_id):
-    """TODO (Role 4): find the lowest of the 5 parts and return TIPS[that_part]."""
-    return ""
+    """Tip for the lowest of the 5 parts."""
+    parts = course_parts(course_id)
+    weakest = min(parts, key=parts.get)
+    return TIPS[weakest]
 
 
 def all_scores(user_id):
@@ -159,7 +165,7 @@ def all_scores(user_id):
     results = []
     for course in courses:
         score = course_score(course["id"])
-        results.append({"course_code": course["code"], "score": score, "band": band(score)})
+        results.append({"course_code": course["code"], "score": score, "band": band(score), "tip": weakest_tip(course["id"])})
     return results
 
 
