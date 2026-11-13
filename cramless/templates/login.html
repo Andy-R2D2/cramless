@@ -16,21 +16,26 @@
 
         <div class="login-card">
 
-            <h1>Login</h1>
+            <h1>{{t.login}}</h1>
 
             <form id="loginform" method="POST" action="/login">
-                <label for="email">Email: </label>
-                <input type="email" id="email" name="email" required />
+
+                <div class="form-row">
+                    <label for="email">{{t.email}}: </label>
+                    <input type="email" id="email" name="email" required />
+                </div>
+                
+                <div class="form-row">
+                    <label for="password">{{t.password}}: </label>
+                    <input type="password" id="password" name="password" required />
+                </div>                
         
-                <label for="password">Password: </label>
-                <input type="password" id="password" name="password" required />
-        
-                <button type="submit">Log In</button>
+                <button type="submit">{{t.login}}</button>
             </form>
         
             <p class="signup-link">
-                New user?
-                <a href="/register">Sign up</a>
+                {{t.newUser}}?
+                <a href="/register"> {{t.signUp}} </a>
             </p>
         </div>
   </div>
@@ -63,12 +68,16 @@
         align-items: center;
         border-radius: 8px;
         box-shadow: 0 4px 6px rgba(112, 101, 101, 0.1);
-        width: 250px;
+        width: 279px;
     }
 
 
     input[type="email"], input[type="password"] {
         margin-bottom: 1rem;
+    }
+
+    .form-row {
+        margin-right: 1rem;
     }
 </style>
 
