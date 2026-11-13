@@ -93,13 +93,30 @@ def adherence(course_id):
 
 
 def consistency(course_id):
-    """TODO (Role 4): number of different days with a study session in the last 7 days / 7."""
-    return 0
+    """% of the last7 days (today included) with at least one study session for this course."""
+    since = date.today() - timedelta(days=6)
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT (DISTINCT study_date) AS days FROM study_sessions WHERE course_id = ? AND study_date >= ?",
+        (course_id, since.isoformat()),
+    ).fetchone()
+    conn.close()
+    return percent(row["days"], 7)
 
 
 def freshness(course_id):
-    """TODO (Role 4): % of cards whose last_reviewed is within the last 7 days."""
-    return 0
+    """% of the course's flashcards reviewed in the last 7 days. Never-reviewed cards count as stale."""
+    since = date.today() - timedelta(days=6)
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN f.last_reviewed >= ? THEN 1 ELSE 0 END) AS fresh
+           FROM flashcards f JOIN lectures l ON f.lecture_id = l.id
+           WHERE l.course_id = ?""",
+        (since.isoformat(), course_id),
+    ).fetchone()
+    conn.close()
+    return percent(row["fresh"] or 0, row["total"])
 
 
 # ---------------------------------------------------------------------------
