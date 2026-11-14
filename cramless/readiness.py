@@ -139,15 +139,25 @@ def course_score(course_id):
     return round(sum(WEIGHTS[name] * value for name, value in parts.items()))
 
 
+BANDS = [
+    (80, "Exam ready", "You are in great shape. Keep short review sessions going so it stays that way."),
+    (60, "On track", "Solid progress. Focus on the cards you still miss to push into exam-ready territory."),
+    (40, "Getting there", "You've started, but gaps remain. Aim for a study session every day this week."),
+    (20, "Needs attention", "You're behind where you want to be. Open the lectures you haven't reviewed yet."),
+    (0, "Falling behind", "Time to start. Pick the course with the closest exam and do 25 minutes today.")
+    
+]
 def band(score):
-    """Label for a score, shown with a colour on the page."""
-    if score >= 80:
-        return "Exam ready"
-    if score >= 60:
-        return "On track"
-    if score >= 40:
-        return "Needs attention"
-    return "Falling behind"
+    """Label for a 20-point score band (0,19, 20-39, 40-59, 60-79, 80-100)."""
+    for floor, label, _ in BANDS:
+        if score >= floor:
+            return label
+
+def band_tip(score):
+    """Human-written tip for the score's band (#14)."""
+    for floor, _, tip in BANDS:
+        if score >= floor:
+            return tip
 
 
 def weakest_tip(course_id):
@@ -165,7 +175,12 @@ def all_scores(user_id):
     results = []
     for course in courses:
         score = course_score(course["id"])
-        results.append({"course_code": course["code"], "score": score, "band": band(score), "tip": weakest_tip(course["id"])})
+        results.append({
+            "course_code": course["code"], 
+            "score": score, "band": band(score), 
+            "tip": weakest_tip(course["id"]), 
+            "band_tip": band_tip(score)
+        })
     return results
 
 

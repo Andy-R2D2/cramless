@@ -22,7 +22,9 @@
     <h2>{{ s.course_code }}</h2>
     <div class="score">{{ s.score }}/100</div>
     <span class="band b{{ (s.score // 20) if s.score < 100 else 4 }}">{{ s.band }}</span>
-    <p><strong>Tip:</strong> {{ s.tip }}</p>
+    <p><strong>Weakest Area: </strong>{{ s.tip }}</p>
+    <p><strong>Tip:</strong> {{ s.band_tip }}</p>
+    
   </div>
   {% endfor %}
 </body>
