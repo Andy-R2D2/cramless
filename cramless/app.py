@@ -33,8 +33,28 @@ create_tables()
 
 # TODO (Role 1): add every piece of text the HTML pages show, in both languages
 TRANSLATIONS = {
-    "en": {"welcome": "Study steady. Skip the cram.", "dashboard": "Dashboard"},
-    "fr": {"welcome": "Étudiez régulièrement. Oubliez le bachotage.", "dashboard": "Tableau de bord"},
+    "en": {"welcome": "Study steady. Skip the cram.", 
+           "register": "Register",
+           "login": "Login",
+           "email": "Email",
+           "password": "Password",
+           "confirmPassword": "Confirm Password",
+           "existingUser": "Existing User",
+           "newUser": "New User",
+           "signIn": "Sign In",
+           "signUp": "Sign Up",
+           "dashboard": "Dashboard"},
+    "fr": {"welcome": "Étudiez régulièrement. Oubliez le bachotage.",
+           "register": "Registre",
+           "login": "Connexion",
+           "email": "E-mail",
+           "password": "Mot de passe",
+           "confirmPassword": "Confirmez le mot de passe",
+           "existingUser": "Déjà utilisateur",
+           "newUser": "Nouvel Utilisateur",
+           "signIn": "Se Connecter",
+           "signUp": "S'inscrire",
+           "dashboard": "Tableau de bord"},
 }
 
 # Rule-based tips for the homepage (functionality #1)
@@ -58,7 +78,11 @@ def switch_language(lang):
     """EN/FR button: save the choice and go back to the previous page."""
     if lang in TRANSLATIONS:
         session["language"] = lang
-    return redirect(request.referrer or url_for("home"))
+
+        user_id = current_user_id()
+        if user_id:
+            auth.set_language(user_id, lang)
+    return redirect(request.referrer or (url_for("home")))
 
 
 def current_user_id():
@@ -93,8 +117,10 @@ def register():
         
 
         if user_id:
-            session["user_id"] = user_id
-            return redirect(url_for("dashboard"))
+            lang = session.get("language", "en")# get the language from the session, default to English
+            auth.set_language(user_id, lang)# save the language choice in the database
+
+            return redirect(url_for("login"))
         return render_template("register.html", error="This email is already used.")
     return render_template("register.html")
 
@@ -109,6 +135,10 @@ def login():
             return redirect(url_for("dashboard"))
         return render_template("login.html", error="Wrong email or password.")
     return render_template("login.html")
+
+def set_language(user_id, lang):
+    """Save the student's language choice (en/fr) in the users table."""
+    auth.set_language(user_id, lang)
 
 
 @app.route("/logout")

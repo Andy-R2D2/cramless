@@ -46,4 +46,9 @@ def check_login(email, password):
 
 
 # TODO (Role 1): save the student's language choice (en/fr) in the users table
-# def set_language(user_id, language): ...
+def set_language(user_id, lang): 
+    """Save the student's language choice (en/fr) in the users table."""
+    conn = get_connection()
+    conn.execute("UPDATE users SET language = ? WHERE id = ?", (lang, user_id))
+    conn.commit()
+    conn.close()
