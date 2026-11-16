@@ -147,6 +147,10 @@ def logout():
     session.pop("user_id", None)
     return redirect(url_for("home"))
 
+@app.route("/policy")
+def policy():
+    """Content & Privacy Policy (#16). Role 4."""
+    return render_template("policy.html")
 
 @app.route("/dashboard")
 def dashboard():
