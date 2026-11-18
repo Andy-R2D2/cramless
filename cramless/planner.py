@@ -5,9 +5,10 @@ planner.py — ROLE 3. Exam dates, timetable, daily goals, daily plan, study tim
 Everything here is RULE-BASED (no AI): predictable and easy to explain.
 """
 
-from datetime import date
+from datetime import date, datetime
 
 from database import get_connection
+import readiness
 
 # Weights for the priority rules. Tune them as a team.
 EXAM_WEIGHT = 3.0        # exam coming soon -> more time
@@ -42,22 +43,51 @@ def update_exam(exam_id, new_date, is_tentative):
     conn.close()
 
 
+def get_exams(user_id):
+    """Fetch all upcoming and past exams for a user's courses."""
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT exams.id, exams.course_id, exams.kind, exams.exam_date, exams.is_tentative, courses.code AS course_code
+           FROM exams
+           JOIN courses ON exams.course_id = courses.id
+           WHERE courses.user_id = ?
+           ORDER BY exams.exam_date ASC""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
 def add_class_time(user_id, course_id, weekday, start_time, end_time):
     """Add a class to the weekly timetable after validating start < end time."""
-    # Convert string times (e.g. '09:00', '10:30') to compare properly
     t_start = datetime.strptime(start_time, "%H:%M").time()
     t_end = datetime.strptime(end_time, "%H:%M").time()
-    
+
     if t_start >= t_end:
         raise ValueError("Class start time must be strictly before end time.")
 
     conn = get_connection()
     conn.execute(
-        "INSERT INTO timetable (user_id, course_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO class_times (user_id, course_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
         (user_id, course_id, weekday, start_time, end_time),
     )
     conn.commit()
     conn.close()
+
+
+def get_timetable(user_id):
+    """Fetch the user's weekly class schedule ordered by day and start time."""
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT class_times.id, class_times.weekday, class_times.start_time, class_times.end_time, courses.code AS course_code
+           FROM class_times
+           JOIN courses ON class_times.course_id = courses.id
+           WHERE class_times.user_id = ?
+           ORDER BY class_times.weekday ASC, class_times.start_time ASC""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return rows
 
 
 def set_daily_goal(user_id, weekday, hours, reminder_time=None):
@@ -74,12 +104,23 @@ def set_daily_goal(user_id, weekday, hours, reminder_time=None):
     conn.close()
 
 
+def get_daily_goals(user_id):
+    """Return a dict mapping weekday (0=Mon .. 6=Sun) -> {'hours': float, 'reminder_time': str}."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT weekday, hours, reminder_time FROM daily_goals WHERE user_id = ?",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return {row["weekday"]: {"hours": row["hours"], "reminder_time": row["reminder_time"]} for row in rows}
+
+
 def todays_goal_minutes(user_id):
     """Today's goal in minutes (0 if the student didn't set one for today)."""
     conn = get_connection()
     row = conn.execute(
         "SELECT hours FROM daily_goals WHERE user_id = ? AND weekday = ?",
-        (user_id, date.today().weekday()),  # Monday = 0
+        (user_id, date.today().weekday()),
     ).fetchone()
     conn.close()
     return int(row["hours"] * 60) if row else 0
@@ -123,7 +164,6 @@ def priority_score(course_id, readiness_score):
     conn = get_connection()
     today = date.today()
 
-    # Find the closest upcoming exam for this course
     exam_row = conn.execute(
         """SELECT exam_date FROM exams 
            WHERE course_id = ? AND exam_date >= ? 
@@ -138,7 +178,6 @@ def priority_score(course_id, readiness_score):
         if days_left <= EXAM_WINDOW_DAYS:
             exam_part = 1.0 - (days_left / EXAM_WINDOW_DAYS)
 
-    # Count lectures that have not been reviewed yet
     unreviewed_row = conn.execute(
         "SELECT COUNT(*) AS count FROM lectures WHERE course_id = ? AND reviewed = 0",
         (course_id,),
@@ -146,18 +185,16 @@ def priority_score(course_id, readiness_score):
     unreviewed = unreviewed_row["count"] if unreviewed_row else 0
     conn.close()
 
-    # Formula per specifications
-    score = (
+    return (
         0.5
         + (EXAM_WEIGHT * exam_part)
         + (UNREVIEWED_WEIGHT * unreviewed)
         + (READINESS_WEIGHT * (1.0 - (readiness_score / 100.0)))
     )
-    return score
 
 
 def build_daily_plan(user_id):
-   """
+    """
     Splits today's study goal across user courses weighted by priority score.
     Returns a sorted list of plans per course:
         [{"course_code": "CSCI 3230U", "minutes": 90, "lectures": ["Lecture 4", "Lecture 5"]}, ...]
@@ -168,7 +205,7 @@ def build_daily_plan(user_id):
 
     conn = get_connection()
     courses = conn.execute(
-        "SELECT id, code, title FROM courses WHERE user_id = ?",
+        "SELECT id, code, name FROM courses WHERE user_id = ?",
         (user_id,),
     ).fetchall()
 
@@ -176,7 +213,6 @@ def build_daily_plan(user_id):
         conn.close()
         return []
 
-    # Calculate individual priority scores & aggregate total
     course_data = []
     total_score = 0.0
 
@@ -194,21 +230,17 @@ def build_daily_plan(user_id):
         })
 
     plan = []
-    
     for c in course_data:
-        # Calculate raw split in minutes and round to nearest 15 minutes
         raw_minutes = goal * (c["priority_score"] / total_score)
         allocated_minutes = int(round(raw_minutes / 15.0) * 15)
 
-        # Skip courses with negligible rounded allocation
         if allocated_minutes <= 0:
             continue
 
-        # Fetch up to 2 target lectures (prioritizing unreviewed lectures first)
         lectures_rows = conn.execute(
             """SELECT title FROM lectures 
                WHERE course_id = ? 
-               ORDER BY reviewed ASC, id ASC 
+               ORDER BY reviewed ASC, number ASC 
                LIMIT 2""",
             (c["course_id"],),
         ).fetchall()
@@ -223,11 +255,7 @@ def build_daily_plan(user_id):
         })
 
     conn.close()
-
-    # Sort daily plan by priority score (highest first)
     plan.sort(key=lambda x: x["_score"], reverse=True)
-
-    # Clean internal sorting key before returning output
     for item in plan:
         item.pop("_score", None)
 
@@ -235,14 +263,10 @@ def build_daily_plan(user_id):
 
 
 def is_goal_realistic(user_id, weekday):
-    """
-    Warns (returns False) if total class commitments + planned study hours exceed 14 hours for a weekday.
-    """
+    """Warns (returns False) if total class commitments + planned study hours exceed 14 hours."""
     conn = get_connection()
-
-    # Calculate total class time in hours for the specified weekday
     timetable_rows = conn.execute(
-        "SELECT start_time, end_time FROM timetable WHERE user_id = ? AND weekday = ?",
+        "SELECT start_time, end_time FROM class_times WHERE user_id = ? AND weekday = ?",
         (user_id, weekday),
     ).fetchall()
 
@@ -252,14 +276,11 @@ def is_goal_realistic(user_id, weekday):
         t_end = datetime.strptime(row["end_time"], "%H:%M")
         class_hours += (t_end - t_start).total_seconds() / 3600.0
 
-    # Fetch configured daily study goal in hours
     goal_row = conn.execute(
         "SELECT hours FROM daily_goals WHERE user_id = ? AND weekday = ?",
         (user_id, weekday),
     ).fetchone()
-    
     conn.close()
 
     study_hours = goal_row["hours"] if goal_row else 0.0
-
     return (class_hours + study_hours) <= 14.0

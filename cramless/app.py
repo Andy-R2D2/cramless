@@ -165,13 +165,104 @@ def dashboard():
     )
 
 
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    """Exams, weekly class timetable, and daily study goals (Role 3)."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    error = None
+    warning = None
+    message = None
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "add_exam":
+            planner.add_exam(
+                int(request.form["course_id"]),
+                request.form["kind"],
+                request.form["exam_date"],
+                "is_tentative" in request.form,
+            )
+            message = "Exam added."
+
+        elif action == "update_exam":
+            planner.update_exam(
+                int(request.form["exam_id"]),
+                request.form["new_date"],
+                "is_tentative" in request.form,
+            )
+            message = "Exam updated."
+
+        elif action == "add_class":
+            weekday = int(request.form["weekday"])
+            try:
+                planner.add_class_time(
+                    user_id,
+                    int(request.form["course_id"]),
+                    weekday,
+                    request.form["start_time"],
+                    request.form["end_time"],
+                )
+                message = "Class added to timetable."
+                if not planner.is_goal_realistic(user_id, weekday):
+                    warning = "Total class + study time for this day exceeds 14 hours."
+            except ValueError as e:
+                error = str(e)
+
+        elif action == "set_goal":
+            weekday = int(request.form["weekday"])
+            hours = float(request.form["hours"])
+            reminder = request.form.get("reminder_time") or None
+            planner.set_daily_goal(user_id, weekday, hours, reminder)
+            message = "Daily goal saved."
+            if not planner.is_goal_realistic(user_id, weekday):
+                warning = "Total class + study time for this day exceeds 14 hours."
+
+    return render_template(
+        "setup.html",
+        courses=courses.get_courses(user_id),
+        exams=planner.get_exams(user_id),
+        timetable=planner.get_timetable(user_id),
+        goals=planner.get_daily_goals(user_id),
+        error=error,
+        warning=warning,
+        message=message,
+    )
+
+
+@app.route("/plan", methods=["GET", "POST"])
+def plan():
+    """Today's study plan, JS stopwatch timer, and offline study log (Role 3)."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    message = None
+    if request.method == "POST":
+        course_id = int(request.form["course_id"])
+        minutes = int(request.form["minutes"])
+        source = request.form.get("source", "offline")
+        if minutes > 0:
+            planner.log_study(user_id, course_id, minutes, source)
+            message = f"Logged {minutes} minutes ({source})."
+
+    return render_template(
+        "plan.html",
+        courses=courses.get_courses(user_id),
+        daily_plan=planner.build_daily_plan(user_id),
+        minutes_done=planner.minutes_studied_today(user_id),
+        goal_minutes=planner.todays_goal_minutes(user_id),
+        message=message,
+    )
+
+
 # TODO (Role 1, with each role): add the remaining pages here, for example:
 #   /courses                     -> list + add courses           (Role 2)
 #   /course/<id>                 -> lectures + upload form        (Role 2)
 #   /lecture/<id>                -> summary + prev/next           (Role 2)
 #   /lecture/<id>/flashcards     -> flashcard review              (Role 2)
-#   /setup                       -> exams, timetable, daily goals (Role 3)
-#   /plan                        -> today's plan + timer          (Role 3)
 #   /readiness                   -> score per course              (Role 4)
 # Each route should: check login, call ONE function from that role's file,
 # then render_template(...).
