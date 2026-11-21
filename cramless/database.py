@@ -51,7 +51,9 @@ def create_tables():
             number    INTEGER NOT NULL,           -- 1, 2, 3 ... (Lecture 1 to current)
             title     TEXT NOT NULL,
             pdf_path  TEXT NOT NULL,              -- file saved in the uploads/ folder
-            reviewed  INTEGER DEFAULT 0           -- 1 once the student opened it (readiness)
+            reviewed  INTEGER DEFAULT 0,          -- 1 once the student opened it (readiness)
+            original_filename TEXT,               -- name of the file the student uploaded (shown on the course page)
+            uploaded_at       TEXT                -- 'YYYY-MM-DD'
         );
 
         CREATE TABLE IF NOT EXISTS summaries (
@@ -109,8 +111,26 @@ def create_tables():
         );
         """
     )
+    _add_missing_columns(conn)
     conn.commit()
     conn.close()
+
+
+def _add_missing_columns(conn):
+    """
+    Upgrade databases created before a column was added, so teammates
+    don't have to delete their cramless.db. (CREATE TABLE IF NOT EXISTS
+    doesn't add new columns to a table that already exists.)
+    """
+    new_columns = {
+        # table: [(column, type), ...]
+        "lectures": [("original_filename", "TEXT"), ("uploaded_at", "TEXT")],
+    }
+    for table, columns in new_columns.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for column, col_type in columns:
+            if column not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
 
 
 if __name__ == "__main__":

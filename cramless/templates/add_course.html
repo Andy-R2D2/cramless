@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{#
+  add_course.html — ROLE 2 (issue #3: Add course)
+  Opened from the "+ Add course" box on the dashboard.
+  After saving, the student goes back to the dashboard and sees the new course box.
+#}
+
+{% block title %}Cramless — {{ t.addCourse }}{% endblock %}
+
+{% block head %}
+<style>
+  /* Narrow centred card for a short form */
+  .form-card { max-width: 520px; margin: 0 auto; }
+  .field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+  .field label { font-weight: 600; font-size: 0.92rem; }
+  .field input { width: 100%; }
+  .hint { color: var(--muted); font-size: 0.82rem; }
+  .actions { display: flex; gap: 0.65rem; margin-top: 0.5rem; }
+  .actions a { text-decoration: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="form-card">
+    <div class="page-header">
+      <h1>{{ t.addCourse }}</h1>
+      <p>{{ t.addCourseIntro }}</p>
+    </div>
+
+    {# Error from courses.add_course(), e.g. empty field or duplicate code #}
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <form method="post" class="card">
+      <div class="field">
+        <label for="code">{{ t.courseCode }}</label>
+        {# value="..." keeps what the student typed if there was an error #}
+        <input type="text" id="code" name="code" value="{{ code }}" maxlength="20"
+               placeholder="CSCI 3230U" required autofocus>
+        <span class="hint">{{ t.courseCodeHint }}</span>
+      </div>
+
+      <div class="field">
+        <label for="name">{{ t.courseName }}</label>
+        <input type="text" id="name" name="name" value="{{ name }}" maxlength="80"
+               placeholder="Web Development" required>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn">{{ t.addCourse }}</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">{{ t.cancel }}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

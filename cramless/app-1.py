@@ -22,6 +22,8 @@ from database import create_tables
 app = Flask(__name__)
 # Secret key signs the login session cookie. Change it before deploying!
 app.secret_key = "dev-only-change-me"
+# Refuse uploads bigger than the lecture PDF limit (+1 MB for the rest of the form)
+app.config["MAX_CONTENT_LENGTH"] = (courses.MAX_UPLOAD_MB + 1) * 1024 * 1024
 
 # Create the tables automatically when the app starts
 create_tables()
@@ -73,6 +75,38 @@ TRANSLATIONS = {
         "logOffline": "Log offline study",
         "editSetup": "Edit exams, timetable, goals",
         "tipOfDay": "Tip of the day",
+        # --- Courses (issue #3) ---
+        "courses": "Courses",
+        "addCourseIntro": "Add one of the courses you're taking this term.",
+        "courseCode": "Course code",
+        "courseCodeHint": "As it appears on your timetable, e.g. CSCI 3230U",
+        "courseName": "Course name",
+        "cancel": "Cancel",
+        "coursesIntro": "Edit or delete your courses.",
+        "confirmDelete": "This also deletes all its lectures and flashcards. Delete",
+        "delete": "Delete",
+        "edit": "Edit",
+        "save": "Save",
+        "noCoursesYet": "No courses yet. Add your first one!",
+        # --- Course page + upload (issue #4) ---
+        "backToDashboard": "Back to dashboard",
+        "uploadedLectures": "Uploaded lectures",
+        "missingLectures": "Missing:",
+        "lectureWord": "Lecture",
+        "uploadedOn": "uploaded",
+        "summaryReady": "Summary ready",
+        "flashcardsWord": "flashcards",
+        "summaryPending": "Summary not generated yet",
+        "confirmDeleteLecture": "This also deletes its summary and flashcards. Delete lecture",
+        "noLecturesHere": "No lectures yet. Upload Lecture 1 below.",
+        "uploadLecture": "Upload a lecture",
+        "lectureNumber": "Lecture #",
+        "lectureTitle": "Title",
+        "lectureTitleHint": "e.g. CSS Layout (optional)",
+        "pdfFile": "PDF file",
+        "pdfOnly": "PDF only, up to",
+        "upload": "Upload",
+        "summaryComingSoon": "The summary and flashcards for this lecture will appear here.",
     },
     "fr": {
         # --- Accueil, connexion, inscription (Meron) ---
@@ -113,6 +147,38 @@ TRANSLATIONS = {
         "logOffline": "Noter une étude hors ligne",
         "editSetup": "Modifier examens, horaire, objectifs",
         "tipOfDay": "Astuce du jour",
+        # --- Cours (issue #3) ---
+        "courses": "Cours",
+        "addCourseIntro": "Ajoutez un des cours que vous suivez ce trimestre.",
+        "courseCode": "Code du cours",
+        "courseCodeHint": "Comme sur votre horaire, ex. CSCI 3230U",
+        "courseName": "Nom du cours",
+        "cancel": "Annuler",
+        "coursesIntro": "Modifiez ou supprimez vos cours.",
+        "confirmDelete": "Cela supprime aussi tous ses cours magistraux et cartes mémoire. Supprimer",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "save": "Enregistrer",
+        "noCoursesYet": "Aucun cours pour l'instant. Ajoutez le premier !",
+        # --- Page du cours + téléversement (issue #4) ---
+        "backToDashboard": "Retour au tableau de bord",
+        "uploadedLectures": "Cours téléversés",
+        "missingLectures": "Manquants :",
+        "lectureWord": "Cours",
+        "uploadedOn": "téléversé le",
+        "summaryReady": "Résumé prêt",
+        "flashcardsWord": "cartes mémoire",
+        "summaryPending": "Résumé pas encore généré",
+        "confirmDeleteLecture": "Cela supprime aussi son résumé et ses cartes mémoire. Supprimer le cours",
+        "noLecturesHere": "Aucun cours pour l'instant. Téléversez le cours 1 ci-dessous.",
+        "uploadLecture": "Téléverser un cours",
+        "lectureNumber": "Cours n°",
+        "lectureTitle": "Titre",
+        "lectureTitleHint": "ex. Mise en page CSS (facultatif)",
+        "pdfFile": "Fichier PDF",
+        "pdfOnly": "PDF seulement, jusqu'à",
+        "upload": "Téléverser",
+        "summaryComingSoon": "Le résumé et les cartes mémoire de ce cours apparaîtront ici.",
     },
 }
 
@@ -319,6 +385,141 @@ def plan():
         goal_minutes=planner.todays_goal_minutes(user_id),
         message=message,
     )
+
+
+@app.route("/courses")
+def courses_page():
+    """My courses (issue #3): list of courses with edit and delete.
+    Named courses_page so the "Courses" link already written in base.html works."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    return render_template(
+        "courses.html",
+        course_cards=courses.get_course_cards(user_id),
+        error=request.args.get("error"),      # set by edit_course below when something fails
+        message=request.args.get("message"),
+    )
+
+
+@app.route("/courses/add", methods=["GET", "POST"])
+def add_course():
+    """Add course page (issue #3). The "+ Add course" box on the dashboard links here."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        course_id, error = courses.add_course(user_id, request.form.get("code"), request.form.get("name"))
+        if error:
+            # Show the form again, keeping what the student typed
+            return render_template("add_course.html", error=error,
+                                   code=request.form.get("code", ""), name=request.form.get("name", ""))
+        # Back to the dashboard, where the new course box appears before "+ Add course"
+        return redirect(url_for("dashboard"))
+
+    return render_template("add_course.html", code="", name="")
+
+
+@app.route("/courses/<int:course_id>/edit", methods=["POST"])
+def edit_course(course_id):
+    """Save a course's new code/name from the My courses page."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    error = courses.rename_course(user_id, course_id, request.form.get("code"), request.form.get("name"))
+    if error:
+        return redirect(url_for("courses_page", error=error))
+    return redirect(url_for("courses_page", message="Course updated."))
+
+
+@app.route("/courses/<int:course_id>/delete", methods=["POST"])
+def delete_course(course_id):
+    """Delete a course (POST only, so a link or a page refresh can't delete by accident)."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    courses.delete_course(user_id, course_id)
+    return redirect(url_for("courses_page", message="Course deleted."))
+
+
+@app.route("/course/<int:course_id>")
+def course_page(course_id):
+    """Course page (issue #4): uploaded lectures (names only) + upload form.
+    The course boxes on the dashboard link here."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    course = courses.get_course(user_id, course_id)
+    if course is None:
+        return redirect(url_for("dashboard"))  # not found, or another student's course
+
+    lectures = courses.get_lectures(course_id)
+    score = readiness.course_score(course_id)
+    return render_template(
+        "course.html",
+        course=course,
+        lectures=lectures,
+        missing=courses.missing_lecture_numbers(lectures),
+        next_number=courses.next_lecture_number(course_id),
+        score=score,
+        band=readiness.band(score),
+        max_mb=courses.MAX_UPLOAD_MB,
+        error=request.args.get("error"),
+        message=request.args.get("message"),
+    )
+
+
+@app.route("/course/<int:course_id>/upload", methods=["POST"])
+def upload_lecture(course_id):
+    """Upload form on the course page."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    lecture_id, error = courses.save_lecture(
+        user_id, course_id,
+        request.form.get("number"), request.form.get("title"), request.files.get("pdf"),
+    )
+    if error:
+        return redirect(url_for("course_page", course_id=course_id, error=error))
+    return redirect(url_for("course_page", course_id=course_id, message="Lecture uploaded."))
+
+
+@app.route("/lecture/<int:lecture_id>")
+def lecture_page(lecture_id):
+    """Lecture page with previous / next buttons.
+    Phase 4 adds the AI summary and flashcards here."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    lecture = courses.get_lecture(user_id, lecture_id)
+    if lecture is None:
+        return redirect(url_for("dashboard"))
+    previous, following = courses.get_previous_and_next(lecture_id)
+    return render_template("lecture.html", lecture=lecture, previous=previous, following=following)
+
+
+@app.route("/lecture/<int:lecture_id>/delete", methods=["POST"])
+def delete_lecture(lecture_id):
+    """Delete a lecture from the course page (POST only, like delete_course)."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    course_id = courses.delete_lecture(user_id, lecture_id)
+    if course_id is None:
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("course_page", course_id=course_id, message="Lecture deleted."))
+
+
+@app.errorhandler(413)
+def file_too_large(error):
+    """Flask stops uploads bigger than MAX_CONTENT_LENGTH before our code runs:
+    send the student back to the course page with a clear message."""
+    course_id = (request.view_args or {}).get("course_id")
+    message = f"The file is too large. The limit is {courses.MAX_UPLOAD_MB} MB."
+    if course_id:
+        return redirect(url_for("course_page", course_id=course_id, error=message))
+    return redirect(url_for("dashboard"))
 
 
 # TODO (Role 1, with each role): add the remaining pages here, for example:

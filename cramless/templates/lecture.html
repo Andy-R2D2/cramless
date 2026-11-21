@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{#
+  lecture.html — ROLE 2 (issue #4, extended in phase 4)
+  One lecture: title, file name, previous / next buttons.
+  Phase 4 (Flashcard generation) adds the AI summary and flashcards in the marked spot.
+#}
+
+{% block title %}Cramless — {{ lecture.course_code }} · {{ t.lectureWord }} {{ lecture.number }}{% endblock %}
+
+{% block head %}
+<style>
+  .back { color: var(--primary); text-decoration: none; font-size: 0.92rem; }
+  .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
+  .pager a { text-decoration: none; }
+  .file-info { color: var(--muted); font-size: 0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <a href="{{ url_for('course_page', course_id=lecture.course_id) }}" class="back">← {{ lecture.course_code }}</a>
+
+  <div class="page-header" style="margin-top: 0.6rem;">
+    <h1>{{ t.lectureWord }} {{ lecture.number }}: {{ lecture.title }}</h1>
+    <p class="file-info">
+      📄 {{ lecture.original_filename or (t.lectureWord ~ " " ~ lecture.number ~ ".pdf") }}
+      {% if lecture.uploaded_at %} · {{ t.uploadedOn }} {{ lecture.uploaded_at }}{% endif %}
+    </p>
+  </div>
+
+  {# ---- PHASE 4: summary (key concepts, explanation, examples) + flashcards go here ---- #}
+  <section class="card">
+    <p class="file-info">{{ t.summaryComingSoon }}</p>
+  </section>
+
+  {# Previous / next lecture in the same course (None = no button) #}
+  <nav class="pager">
+    <div>
+      {% if previous %}
+        <a href="{{ url_for('lecture_page', lecture_id=previous.id) }}" class="btn btn-secondary">← {{ t.lectureWord }} {{ previous.number }}</a>
+      {% endif %}
+    </div>
+    <div>
+      {% if following %}
+        <a href="{{ url_for('lecture_page', lecture_id=following.id) }}" class="btn btn-secondary">{{ t.lectureWord }} {{ following.number }} →</a>
+      {% endif %}
+    </div>
+  </nav>
+{% endblock %}
