@@ -126,3 +126,57 @@ def record_answer(card_id, knew_it):
 def edit_flashcard(card_id, question, answer):
     """TODO (Role 2): let the student fix a bad AI card."""
     pass
+# ---------------------------------------------------------------------------
+# Dashboard helpers (issue #2)
+# ---------------------------------------------------------------------------
+
+def get_course_cards(user_id):
+    """
+    Courses for the dashboard boxes, each with its number of lectures.
+    Returns rows with: id, code, name, lecture_count
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT c.id, c.code, c.name, COUNT(l.id) AS lecture_count
+           FROM courses c
+           LEFT JOIN lectures l ON l.course_id = c.id   -- LEFT JOIN keeps courses with 0 lectures
+           WHERE c.user_id = ?
+           GROUP BY c.id
+           ORDER BY c.code""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def get_setup_progress(user_id):
+    """
+    Which of the 5 setup steps the student has done, for the
+    "Getting started" checklist on the dashboard.
+    Returns a dict like {"course": True, "lectures": False, ..., "done_count": 1, "all_done": False}
+    """
+    conn = get_connection()
+
+    def has_rows(sql):
+        # True if the query finds at least one row for this student
+        return conn.execute(sql, (user_id,)).fetchone() is not None
+
+    progress = {
+        "course": has_rows("SELECT 1 FROM courses WHERE user_id = ? LIMIT 1"),
+        "lectures": has_rows(
+            """SELECT 1 FROM lectures l JOIN courses c ON l.course_id = c.id
+               WHERE c.user_id = ? LIMIT 1"""
+        ),
+        "exams": has_rows(
+            """SELECT 1 FROM exams e JOIN courses c ON e.course_id = c.id
+               WHERE c.user_id = ? LIMIT 1"""
+        ),
+        "timetable": has_rows("SELECT 1 FROM class_times WHERE user_id = ? LIMIT 1"),
+        "goal": has_rows("SELECT 1 FROM daily_goals WHERE user_id = ? LIMIT 1"),
+    }
+    conn.close()
+
+    # Count the finished steps; the checklist disappears when all 5 are done
+    progress["done_count"] = sum(progress.values())
+    progress["all_done"] = progress["done_count"] == 5
+    return progress

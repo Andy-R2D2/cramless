@@ -32,29 +32,88 @@ create_tables()
 # ---------------------------------------------------------------------------
 
 # TODO (Role 1): add every piece of text the HTML pages show, in both languages
+# Keys must be lowercase "en" and "fr": the code looks them up with session["language"]
 TRANSLATIONS = {
-    "en": {"welcome": "Study steady. Skip the cram.", 
-           "register": "Register",
-           "login": "Login",
-           "email": "Email",
-           "password": "Password",
-           "confirmPassword": "Confirm Password",
-           "existingUser": "Existing User",
-           "newUser": "New User",
-           "signIn": "Sign In",
-           "signUp": "Sign Up",
-           "dashboard": "Dashboard"},
-    "fr": {"welcome": "Étudiez régulièrement. Oubliez le bachotage.",
-           "register": "Registre",
-           "login": "Connexion",
-           "email": "E-mail",
-           "password": "Mot de passe",
-           "confirmPassword": "Confirmez le mot de passe",
-           "existingUser": "Déjà utilisateur",
-           "newUser": "Nouvel Utilisateur",
-           "signIn": "Se Connecter",
-           "signUp": "S'inscrire",
-           "dashboard": "Tableau de bord"},
+    "en": {
+        # --- Homepage, login, register (Meron) ---
+        "welcome": "Study steady. Skip the cram.",
+        "register": "Register",
+        "login": "Login",
+        "email": "Email",
+        "password": "Password",
+        "confirmPassword": "Confirm Password",
+        "existingUser": "Existing User",
+        "newUser": "New User",
+        "signIn": "Sign In",
+        "signUp": "Sign Up",
+        "dashboard": "Dashboard",
+        # --- Dashboard (issue #2) ---
+        "welcomeBack": "Welcome back!",
+        "dashboardIntro": "Here's your study overview for today.",
+        "gettingStarted": "Getting started",
+        "stepCourse": "Add a course",
+        "stepLectures": "Upload lectures",
+        "stepExams": "Exam dates",
+        "stepTimetable": "Study timetable",
+        "stepGoal": "Daily goal",
+        "todaysGoal": "Today's goal",
+        "ofTodaysGoal": "of today's goal done",
+        "noGoalToday": "No study goal set for today.",
+        "setGoal": "Set one",
+        "myCourses": "My courses",
+        "addCourse": "Add course",
+        "lecturesWord": "lectures",
+        "readinessWord": "Readiness",
+        "todaysPlan": "Today's study plan",
+        "noLecturesYet": "No lectures uploaded yet",
+        "noPlanYet": "Add a course and set today's goal to get a plan.",
+        "start": "Start",
+        "quickActions": "Quick actions",
+        "startTimer": "Start study timer",
+        "logOffline": "Log offline study",
+        "editSetup": "Edit exams, timetable, goals",
+        "tipOfDay": "Tip of the day",
+    },
+    "fr": {
+        # --- Accueil, connexion, inscription (Meron) ---
+        "welcome": "Étudiez régulièrement. Oubliez le bachotage.",
+        "register": "Registre",
+        "login": "Connexion",
+        "email": "E-mail",
+        "password": "Mot de passe",
+        "confirmPassword": "Confirmez le mot de passe",
+        "existingUser": "Déjà utilisateur",
+        "newUser": "Nouvel Utilisateur",
+        "signIn": "Se Connecter",
+        "signUp": "S'inscrire",
+        "dashboard": "Tableau de bord",
+        # --- Tableau de bord (issue #2) ---
+        "welcomeBack": "Bon retour !",
+        "dashboardIntro": "Voici votre aperçu d'étude pour aujourd'hui.",
+        "gettingStarted": "Pour commencer",
+        "stepCourse": "Ajouter un cours",
+        "stepLectures": "Téléverser des cours",
+        "stepExams": "Dates d'examen",
+        "stepTimetable": "Horaire d'étude",
+        "stepGoal": "Objectif quotidien",
+        "todaysGoal": "Objectif du jour",
+        "ofTodaysGoal": "de l'objectif du jour atteint",
+        "noGoalToday": "Aucun objectif d'étude pour aujourd'hui.",
+        "setGoal": "En définir un",
+        "myCourses": "Mes cours",
+        "addCourse": "Ajouter un cours",
+        "lecturesWord": "cours magistraux",
+        "readinessWord": "Préparation",
+        "todaysPlan": "Plan d'étude du jour",
+        "noLecturesYet": "Aucun cours téléversé",
+        "noPlanYet": "Ajoutez un cours et un objectif du jour pour obtenir un plan.",
+        "start": "Commencer",
+        "quickActions": "Actions rapides",
+        "startTimer": "Lancer le minuteur",
+        "logOffline": "Noter une étude hors ligne",
+        "editSetup": "Modifier examens, horaire, objectifs",
+        "tipOfDay": "Astuce du jour",
+    },
 }
 
 # Rule-based tips for the homepage (functionality #1)
@@ -111,14 +170,11 @@ def register():
         if confirmPassword != password:
             return render_template("register.html", error="Passwords do not match.")
 
-        
         user_id = auth.register_user(request.form["email"], request.form["password"])
 
-        
-
         if user_id:
-            lang = session.get("language", "en")# get the language from the session, default to English
-            auth.set_language(user_id, lang)# save the language choice in the database
+            lang = session.get("language", "en")  # get the language from the session, default to English
+            auth.set_language(user_id, lang)      # save the language choice in the database
 
             return redirect(url_for("login"))
         return render_template("register.html", error="This email is already used.")
@@ -136,6 +192,7 @@ def login():
         return render_template("login.html", error="Wrong email or password.")
     return render_template("login.html")
 
+
 def set_language(user_id, lang):
     """Save the student's language choice (en/fr) in the users table."""
     auth.set_language(user_id, lang)
@@ -150,18 +207,24 @@ def logout():
 
 @app.route("/dashboard")
 def dashboard():
-    """Dashboard (#3): courses, today's plan, hours done vs goal, readiness.
-    TODO (Role 1): create templates/dashboard.html and display these values."""
+    """Dashboard (issue #2): setup checklist, today's goal, course boxes
+    with "+ Add course", today's plan, quick actions and a tip."""
     user_id = current_user_id()
     if not user_id:
         return redirect(url_for("login"))
+
+    # Readiness scores keyed by course code, so each course box can find its own score
+    score_by_code = {s["course_code"]: s for s in readiness.all_scores(user_id)}
+
     return render_template(
         "dashboard.html",
-        courses=courses.get_courses(user_id),
+        checklist=courses.get_setup_progress(user_id),   # 5 setup steps
+        course_cards=courses.get_course_cards(user_id),  # courses + lecture counts
+        score_by_code=score_by_code,
         plan=planner.build_daily_plan(user_id),
         minutes_done=planner.minutes_studied_today(user_id),
         goal_minutes=planner.todays_goal_minutes(user_id),
-        scores=readiness.all_scores(user_id),
+        tip=random.choice(TIPS),
     )
 
 

@@ -15,10 +15,12 @@
                 <a href="{{ url_for('dashboard') }}">{{ t.dashboard }}</a>
                 <a href="{{ url_for('setup') }}">Setup</a>
                 <a href="{{ url_for('plan') }}">Today's Plan & Timer</a>
-                <!-- Teammates can uncomment/add their links once routes exist in app.py:
+                            {# Teammates can uncomment/add their links once routes exist in app.py.
+                   (Jinja comment, not an HTML comment: Jinja still runs url_for() inside
+                   HTML comments and crashes when the route doesn't exist yet.)
                 <a href="{{ url_for('courses_page') }}">Courses</a>
                 <a href="{{ url_for('readiness_page') }}">Readiness</a>
-                -->
+                #}
                 <a href="{{ url_for('logout') }}">Logout</a>
             {% else %}
                 <a href="{{ url_for('login') }}">{{ t.login }}</a>
