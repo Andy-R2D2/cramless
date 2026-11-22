@@ -41,8 +41,12 @@ TRANSLATIONS = {
     "en": {
         # --- Homepage, login, register (Meron) ---
         "welcome": "Study steady. Skip the cram.",
+        "sampleReadiness": "Sample readiness",
+        "setup": "Setup",
+        "todaysPlanTimer": "Today's Plan & Timer",
         "register": "Register",
         "login": "Login",
+        "logout": "Logout",
         "email": "Email",
         "password": "Password",
         "confirmPassword": "Confirm Password",
@@ -138,8 +142,12 @@ TRANSLATIONS = {
     "fr": {
         # --- Accueil, connexion, inscription (Meron) ---
         "welcome": "Étudiez régulièrement. Oubliez le bachotage.",
+        "sampleReadiness": "Préparation des échantillons",
+        "setup": "Configurer",
+        "todaysPlanTimer": "Plan et minuterie de la journée",
         "register": "Registre",
         "login": "Connexion",
+        "logout": "Déconnexion ",
         "email": "E-mail",
         "password": "Mot de passe",
         "confirmPassword": "Confirmez le mot de passe",
