@@ -646,13 +646,18 @@ def file_too_large(error):
         return redirect(url_for("course_page", course_id=course_id, error=message))
     return redirect(url_for("dashboard"))
 
+@app.route("/readiness")
+def readiness_page():
+    """Readiness score per course (#13): score, band and tip. Role 4."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    return render_template("readiness.html", scores=readiness.all_scores(user_id))
 
-# TODO (Role 1, with each role): add the remaining pages here, for example:
-#   /courses                     -> list + add courses           (Role 2)
-#   /course/<id>                 -> lectures + upload form        (Role 2)
-#   /lecture/<id>                -> summary + prev/next           (Role 2)
-#   /lecture/<id>/flashcards     -> flashcard review              (Role 2)
-#   /readiness                   -> score per course              (Role 4)
+# Pages done so far (all routes above):
+#   /courses, /courses/add, /course/<id>, /lecture/<id>    (Role 2) ✅
+#   /setup, /plan                                           (Role 3) ✅
+#   /readiness, /policy                                     (Role 4) ✅
 # Each route should: check login, call ONE function from that role's file,
 # then render_template(...).
 

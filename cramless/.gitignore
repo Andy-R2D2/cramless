@@ -16,3 +16,6 @@ uploads/*
 .vscode/
 .idea/
 .DS_Store
+
+# Tests
+seed_test.py
