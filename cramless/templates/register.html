@@ -26,6 +26,14 @@
                 <input type="password" id="confirmPassword" name="confirmPassword" class="full-width" required>
             </div>
 
+            <!-- Policy checkbox from Raihan's branch (#16): must be ticked to register -->
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="agree" name="agree" required>
+                <label for="agree" style="margin: 0;">
+                    I agree to the <a href="/policy" target="_blank" style="color: var(--primary);">content &amp; privacy policy</a>
+                </label>
+            </div>
+
             <button type="submit" class="btn full-width">{{ t.signUp }}</button>
         </form>
 
