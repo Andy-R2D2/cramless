@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{#
+  course.html — ROLE 2 (issue #4: Upload resources)
+  One page per course: header with readiness, the list of uploaded lectures
+  (names only, not the PDF itself), and the upload form.
+  The course boxes on the dashboard link here.
+#}
+
+{% block title %}Cramless — {{ course.code }}{% endblock %}
+
+{% block head %}
+<style>
+  .back { color: var(--primary); text-decoration: none; font-size: 0.92rem; }
+  .course-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin: 0.6rem 0 1.5rem; }
+  .course-head h1 { font-size: 1.75rem; }
+  .course-head p { color: var(--muted); }
+  .readiness-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0.4rem 0.9rem; font-weight: 600; font-size: 0.92rem; }
+
+  /* Lecture rows: number + title on the left, file info, status, actions on the right */
+  .lecture-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; width: 100%; }
+  .lecture-title { color: var(--text); text-decoration: none; font-weight: 600; }
+  .lecture-title:hover { color: var(--primary); }
+  .file-info { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+  .status-ready { background: var(--success-bg); color: var(--success-text); }
+  .status-waiting { background: #f1f5f9; color: var(--muted); }
+  .btn-small { padding: 0.35rem 0.7rem; font-size: 0.82rem; }
+  .btn-danger { background: var(--danger-bg); color: var(--danger-text); }
+  .btn-danger:hover { background: #fecaca; }
+  @media (max-width: 640px) { .lecture-row { grid-template-columns: 1fr; } }
+
+  /* Upload form */
+  .upload-grid { display: grid; grid-template-columns: 110px 1fr; gap: 0.75rem 1rem; align-items: center; }
+  .upload-grid label { font-weight: 600; font-size: 0.92rem; }
+  .upload-grid input[type="text"] { width: 100%; }
+  .hint { color: var(--muted); font-size: 0.82rem; }
+  @media (max-width: 640px) { .upload-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+  <a href="{{ url_for('dashboard') }}" class="back">← {{ t.backToDashboard }}</a>
+
+  <!-- ===================== Header ===================== -->
+  <div class="course-head">
+    <div>
+      <h1>{{ course.code }}</h1>
+      <p>{{ course.name }}</p>
+    </div>
+    <span class="readiness-pill">{{ t.readinessWord }} {{ score }} · {{ band }}</span>
+  </div>
+
+  {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+  {% if message %}<div class="alert alert-success">✓ {{ message }}</div>{% endif %}
+
+  <!-- ===================== Uploaded lectures ===================== -->
+  <section class="card">
+    <h2>{{ t.uploadedLectures }} ({{ lectures | length }})</h2>
+
+    {# Students should upload every lecture from 1 to the current one: point out gaps #}
+    {% if missing %}
+      <div class="alert alert-warning">
+        {{ t.missingLectures }}
+        {% for n in missing %}{{ t.lectureWord }} {{ n }}{{ ", " if not loop.last }}{% endfor %}
+      </div>
+    {% endif %}
+
+    {% if lectures %}
+      <ul class="item-list">
+        {% for lec in lectures %}
+        <li>
+          <div class="lecture-row">
+            <div>
+              {# Clicking the title opens the lecture page (summary + flashcards in phase 4) #}
+              <a class="lecture-title" href="{{ url_for('lecture_page', lecture_id=lec.id) }}">
+                {{ t.lectureWord }} {{ lec.number }}: {{ lec.title }}
+              </a>
+              {# Only the file NAME is shown, not the PDF itself #}
+              <div class="file-info">
+                📄 {{ lec.original_filename or (t.lectureWord ~ " " ~ lec.number ~ ".pdf") }}
+                {% if lec.uploaded_at %} · {{ t.uploadedOn }} {{ lec.uploaded_at }}{% endif %}
+              </div>
+            </div>
+
+            {# Status: ready once phase 4 has generated the summary and flashcards #}
+            {% if lec.has_summary %}
+              <span class="badge status-ready">✓ {{ t.summaryReady }} · {{ lec.card_count }} {{ t.flashcardsWord }}</span>
+            {% elif lec.ai_error %}
+              {# Generation failed: the lecture page explains why and has a retry button #}
+              <span class="badge" style="background: var(--danger-bg); color: var(--danger-text);">⚠ {{ t.summaryFailed }}</span>
+            {% else %}
+              <span class="badge status-waiting">{{ t.summaryPending }}</span>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('delete_lecture', lecture_id=lec.id) }}"
+                  onsubmit='return confirm({{ (t.confirmDeleteLecture ~ " " ~ lec.number ~ "?") | tojson }});'>
+              <button type="submit" class="btn btn-danger btn-small">{{ t.delete }}</button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="hint" style="font-size: 0.92rem;">{{ t.noLecturesHere }}</p>
+    {% endif %}
+  </section>
+
+  <!-- ===================== Upload form ===================== -->
+  <section class="card">
+    <h2>{{ t.uploadLecture }}</h2>
+    {# enctype="multipart/form-data" is required for file uploads #}
+    <form method="post" action="{{ url_for('upload_lecture', course_id=course.id) }}" enctype="multipart/form-data">
+      <div class="upload-grid">
+        <label for="number">{{ t.lectureNumber }}</label>
+        {# Pre-filled with the next lecture number #}
+        <input type="number" id="number" name="number" min="1" value="{{ next_number }}" required style="width: 100px;">
+
+        <label for="title">{{ t.lectureTitle }}</label>
+        <input type="text" id="title" name="title" maxlength="120" placeholder="{{ t.lectureTitleHint }}">
+
+        <label for="pdf">{{ t.pdfFile }}</label>
+        <div>
+          {# accept= only shows PDFs in the file picker; the server checks again #}
+          <input type="file" id="pdf" name="pdf" accept="application/pdf,.pdf" required>
+          <div class="hint">{{ t.pdfOnly }} {{ max_mb }} MB</div>
+        </div>
+      </div>
+      <button type="submit" class="btn" style="margin-top: 1rem;">{{ t.upload }}</button>
+    </form>
+  </section>
+{% endblock %}

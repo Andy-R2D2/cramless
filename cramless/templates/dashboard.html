@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{#
+  dashboard.html — ROLE 2 (issue #2: Dashboard)
+  First page after login. Sections match the dashboard wireframe:
+    1. Welcome + "Getting started" checklist (hidden once all 5 steps are done)
+    2. Today's goal progress bar
+    3. My courses: one box per course + the "+ Add course" box (always last)
+    4. Today's study plan (from planner.build_daily_plan)
+    5. Quick actions + tip of the day
+  Data comes from the dashboard() route in app.py.
+#}
+
+{% block title %}Cramless — {{ t.dashboard }}{% endblock %}
+
+{% block head %}
+<style>
+  /* ---------- Dashboard-only styles (uses the colour variables from style.css) ---------- */
+
+  /* Checklist of the 5 setup steps */
+  .checklist { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+  .checklist li { font-size: 0.92rem; color: var(--muted); }
+  .checklist li.done { color: var(--success-text); font-weight: 600; }
+  .checklist a { color: var(--primary); text-decoration: none; }
+
+  /* Course grid: boxes wrap onto new rows when they don't fit */
+  .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .course-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 6px solid var(--border);   /* colour strip = readiness band */
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    text-decoration: none;
+    color: var(--text);
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .course-box:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); }
+  .course-code { font-weight: 700; font-size: 1.1rem; }
+  .course-name, .course-meta { color: var(--muted); font-size: 0.9rem; }
+  .course-score { margin-top: auto; font-weight: 600; font-size: 0.9rem; }
+
+  /* Readiness band colours (strip on the left + score text) */
+  .band-ready     { border-left-color: #16a34a; } .band-ready .course-score     { color: #16a34a; }
+  .band-track     { border-left-color: #ca8a04; } .band-track .course-score     { color: #ca8a04; }
+  .band-attention { border-left-color: #ea580c; } .band-attention .course-score { color: #ea580c; }
+  .band-behind    { border-left-color: #dc2626; } .band-behind .course-score    { color: #dc2626; }
+
+  /* The "+ Add course" box: dashed border, centred plus sign */
+  .add-box {
+    border: 2px dashed var(--primary);
+    background: #f5f7ff;
+    color: var(--primary);
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .add-box .plus { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+
+  /* Today's plan rows */
+  .plan-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .plan-row small { color: var(--muted); }
+
+  /* Quick action links */
+  .quick-links { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+  .quick-links a { color: var(--primary); text-decoration: none; font-weight: 500; }
+
+  .muted { color: var(--muted); font-size: 0.92rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+  <!-- ===================== 1. Welcome ===================== -->
+  <div class="page-header">
+    <h1>{{ t.welcomeBack }}</h1>
+    <p>{{ t.dashboardIntro }}</p>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- ===================== 1b. Getting started checklist ===================== -->
+    {# Only shown until every setup step is done #}
+    {% if not checklist.all_done %}
+    <section class="card">
+      <h2>{{ t.gettingStarted }} ({{ checklist.done_count }}/5)</h2>
+      <ul class="checklist">
+        {# Each step: ✔ when done, otherwise ○ and a link to where it's done #}
+        <li class="{{ 'done' if checklist.course }}">
+          {{ '✔' if checklist.course else '○' }}
+          {% if checklist.course %}{{ t.stepCourse }}{% else %}<a href="/courses/add">{{ t.stepCourse }}</a>{% endif %}
+        </li>
+        <li class="{{ 'done' if checklist.lectures }}">
+          {{ '✔' if checklist.lectures else '○' }} {{ t.stepLectures }}
+        </li>
+        <li class="{{ 'done' if checklist.exams }}">
+          {{ '✔' if checklist.exams else '○' }}
+          {% if checklist.exams %}{{ t.stepExams }}{% else %}<a href="{{ url_for('setup') }}">{{ t.stepExams }}</a>{% endif %}
+        </li>
+        <li class="{{ 'done' if checklist.timetable }}">
+          {{ '✔' if checklist.timetable else '○' }}
+          {% if checklist.timetable %}{{ t.stepTimetable }}{% else %}<a href="{{ url_for('setup') }}">{{ t.stepTimetable }}</a>{% endif %}
+        </li>
+        <li class="{{ 'done' if checklist.goal }}">
+          {{ '✔' if checklist.goal else '○' }}
+          {% if checklist.goal %}{{ t.stepGoal }}{% else %}<a href="{{ url_for('setup') }}">{{ t.stepGoal }}</a>{% endif %}
+        </li>
+      </ul>
+    </section>
+    {% endif %}
+    {% if reminder %}
+      <section class="card" role="status" style="border-left: 5px solid #e67e22;">
+        <strong>&#9200; {{ reminder }}</strong>
+      </section>
+    {% endif %}
+    <!-- ===================== 2. Today's goal ===================== -->
+    <section class="card">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <h2 style="margin: 0;">{{ t.todaysGoal }}</h2>
+        {% if goal_minutes > 0 %}
+          <strong>{{ minutes_done }} / {{ goal_minutes }} min</strong>
+        {% endif %}
+      </div>
+
+      {% if goal_minutes > 0 %}
+        {# Percentage of today's goal, capped at 100% so the bar never overflows #}
+        {% set pct = (minutes_done / goal_minutes * 100) | round | int %}
+        <div class="progress-wrap">
+          <div class="progress-fill" style="width: {{ 100 if pct > 100 else pct }}%;"></div>
+        </div>
+        <p class="muted">{{ pct }}% {{ t.ofTodaysGoal }}</p>
+      {% else %}
+        <p class="muted">{{ t.noGoalToday }} <a href="{{ url_for('setup') }}">{{ t.setGoal }}</a></p>
+      {% endif %}
+    </section>
+
+  </div>
+
+  <!-- ===================== 3. My courses ===================== -->
+  <h2 style="margin-bottom: 0.9rem;">{{ t.myCourses }}</h2>
+
+  {# Map each readiness band to a CSS class for the colour strip #}
+  {% set band_class = {
+      "Exam ready": "band-ready",
+      "On track": "band-track",
+      "Needs attention": "band-attention",
+      "Falling behind": "band-behind"
+  } %}
+
+  <div class="course-grid">
+    {# One box per course #}
+    {% for course in course_cards %}
+      {% set s = score_by_code.get(course.code) %}
+      <a class="course-box {{ band_class.get(s.band, '') if s }}" href="/course/{{ course.id }}">
+        <span class="course-code">{{ course.code }}</span>
+        <span class="course-name">{{ course.name }}</span>
+        <span class="course-meta">{{ course.lecture_count }} {{ t.lecturesWord }}</span>
+        {% if s %}
+          <span class="course-score">{{ t.readinessWord }} {{ s.score }} · {{ s.band }}</span>
+        {% endif %}
+      </a>
+    {% endfor %}
+
+    {# "+ Add course" box: drawn after the loop so it's always the LAST box,
+       and the ONLY box on first login when the student has no courses yet #}
+    <a class="course-box add-box" href="/courses/add">
+      <span class="plus">+</span>
+      <span>{{ t.addCourse }}</span>
+    </a>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- ===================== 4. Today's study plan ===================== -->
+    <section class="card">
+      <h2>{{ t.todaysPlan }}</h2>
+      {% if plan %}
+        <ul class="item-list">
+          {% for item in plan %}
+          <li class="plan-row">
+            <div>
+              <strong>{{ item.course_code }} · {{ item.minutes }} min</strong><br>
+              {% if item.lectures %}
+                <small>{{ item.lectures | join(" · ") }}</small>
+              {% else %}
+                <small>{{ t.noLecturesYet }}</small>
+              {% endif %}
+            </div>
+            {# The timer lives on Teni's /plan page #}
+            <a class="btn" href="{{ url_for('plan') }}" style="text-decoration: none;">{{ t.start }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">{{ t.noPlanYet }}</p>
+      {% endif %}
+    </section>
+
+    <!-- ===================== 5. Quick actions + tip ===================== -->
+    <div>
+      <section class="card">
+        <h2>{{ t.quickActions }}</h2>
+        <ul class="quick-links">
+          <li><a href="{{ url_for('plan') }}">▶ {{ t.startTimer }}</a></li>
+          <li><a href="{{ url_for('plan') }}">✎ {{ t.logOffline }}</a></li>
+          <li><a href="{{ url_for('setup') }}">⚙ {{ t.editSetup }}</a></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>{{ t.tipOfDay }}</h2>
+        <p class="muted">{{ tip }}</p>
+      </section>
+    </div>
+
+  </div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if reminder %}
+<script>
+  // Browser notification for the study reminder (#15)
+  // Asks permission once, shows at most once per browser tab. The banner shows either way.
+  const reminderMessage = {{ reminder | tojson }};
+  let alreadyShown = false;
+  try { alreadyShown = sessionStorage.getItem("cramlessReminder") === reminderMessage; } catch (e) {}
+
+  function showReminder(){
+    new Notification("Cramless", { body: reminderMessage });
+    try{ sessionStorage.setItem("cramlessReminder", reminderMessage); } catch (e) {}
+  }
+
+  if (!alreadyShown && "Notification" in window){
+    if (Notification.permission === "granted"){
+      showReminder();
+    } else if (Notification.permission !== "denied"){
+      Notification.requestPermission().then(function (p) { if (p === "granted") showReminder(); })
+    }
+  }
+</script>
+{% endif %}
+{% endblock %}

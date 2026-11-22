@@ -96,7 +96,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 4. Create your .env file and add the OpenAI key (only Role 2 needs it at first)
-cp .env.example .env          # Windows: copy .env.example .env
+cp .env .env          # Windows: copy .env .env
 
 # 5. Run the website (the database is created automatically)
 python app.py

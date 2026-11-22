@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{#
+  courses.html — ROLE 2 (issue #3: My courses)
+  Lists the student's courses. Each row can be edited (code + name) or deleted.
+#}
+
+{% block title %}Cramless — {{ t.myCourses }}{% endblock %}
+
+{% block head %}
+<style>
+  .course-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .course-row .info { flex: 1; min-width: 200px; }
+  .course-row .meta { color: var(--muted); font-size: 0.88rem; }
+  .btn-danger { background: var(--danger-bg); color: var(--danger-text); }
+  .btn-danger:hover { background: #fecaca; }
+  /* The edit form is hidden inside <details> until the student clicks "Edit" */
+  details summary { cursor: pointer; color: var(--primary); font-weight: 500; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  details[open] summary { margin-bottom: 0.6rem; }
+  .edit-form { width: 100%; }
+  .header-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .header-row a { text-decoration: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="page-header header-row">
+    <div>
+      <h1>{{ t.myCourses }}</h1>
+      <p>{{ t.coursesIntro }}</p>
+    </div>
+    <a href="{{ url_for('add_course') }}" class="btn">+ {{ t.addCourse }}</a>
+  </div>
+
+  {# Messages from the edit/delete routes #}
+  {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+  {% if message %}<div class="alert alert-success">✓ {{ message }}</div>{% endif %}
+
+  <section class="card">
+    {% if course_cards %}
+      <ul class="item-list">
+        {% for course in course_cards %}
+        <li>
+          <div class="course-row" style="width: 100%;">
+            <div class="info">
+              <strong>{{ course.code }}</strong> — {{ course.name }}
+              <div class="meta">{{ course.lecture_count }} {{ t.lecturesWord }}</div>
+            </div>
+
+            {# Delete: POST form + browser confirmation, because it also deletes lectures and flashcards #}
+            <form method="post" action="{{ url_for('delete_course', course_id=course.id) }}"
+                  onsubmit='return confirm({{ (t.confirmDelete ~ " " ~ course.code ~ "?") | tojson }});'>
+              <button type="submit" class="btn btn-danger">{{ t.delete }}</button>
+            </form>
+          </div>
+
+          {# Edit: click "Edit" to open a small form below the course #}
+          <details style="width: 100%;">
+            <summary>✎ {{ t.edit }}</summary>
+            <form method="post" action="{{ url_for('edit_course', course_id=course.id) }}" class="form-row edit-form">
+              <input type="text" name="code" value="{{ course.code }}" maxlength="20" required>
+              <input type="text" name="name" value="{{ course.name }}" maxlength="80" required style="flex: 1;">
+              <button type="submit" class="btn">{{ t.save }}</button>
+            </form>
+          </details>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color: var(--muted);">{{ t.noCoursesYet }}</p>
+    {% endif %}
+  </section>
+{% endblock %}

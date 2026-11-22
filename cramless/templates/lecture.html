@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{#
+  lecture.html — ROLE 2 (issues #4 and #5)
+  One lecture with two options:
+    - Summary: key concepts, in-depth explanation, real-life examples
+    - Flashcards: one card at a time, "Show answer", "Knew it" / "Didn't know", edit a card
+  Formulas written in LaTeX ($...$ and $$...$$) are drawn by KaTeX.
+#}
+
+{% block title %}Cramless — {{ lecture.course_code }} · {{ t.lectureWord }} {{ lecture.number }}{% endblock %}
+
+{% block head %}
+{# KaTeX: turns LaTeX like $x^2$ into real math. Loaded from a CDN, pinned version. #}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });"></script>
+
+<style>
+  .back { color: var(--primary); text-decoration: none; font-size: 0.92rem; }
+  .file-info { color: var(--muted); font-size: 0.9rem; }
+  .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
+  .pager a { text-decoration: none; }
+
+  /* The two options: Summary | Flashcards */
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+  .tab { padding: 0.55rem 1.1rem; border-radius: 999px; text-decoration: none; font-weight: 600;
+         color: var(--muted); background: var(--surface); border: 1px solid var(--border); }
+  .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* Summary sections */
+  .ai-text { white-space: pre-line; line-height: 1.65; }   /* keep the AI's line breaks */
+  .ai-tag { font-size: 0.75rem; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 999px; margin-left: 0.4rem; vertical-align: middle; }
+  .summary-actions { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+  /* One flashcard at a time */
+  .flashcard { text-align: center; padding: 2.25rem 1.5rem; }
+  .card-count { color: var(--muted); font-size: 0.88rem; margin-bottom: 0.75rem; }
+  .question { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.25rem; }
+  .flashcard details summary { cursor: pointer; display: inline-block; list-style: none; }
+  .flashcard details summary::-webkit-details-marker { display: none; }
+  .answer { margin-top: 1.25rem; font-size: 1.05rem; padding: 1rem; background: var(--bg); border-radius: 10px; }
+  .answer-buttons { display: flex; justify-content: center; gap: 0.75rem; margin-top: 1.25rem; }
+  .btn-known { background: #16a34a; } .btn-known:hover { background: #15803d; }
+  .btn-missed { background: #dc2626; } .btn-missed:hover { background: #b91c1c; }
+  .progress-wrap { max-width: 420px; margin: 0 auto 1.25rem; }
+  .edit-card { margin-top: 1.5rem; text-align: left; }
+  .edit-card summary { color: var(--primary); cursor: pointer; font-size: 0.9rem; }
+  .edit-card textarea { width: 100%; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; margin: 0.35rem 0 0.6rem; }
+  .edit-card label { font-weight: 600; font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <a href="{{ url_for('course_page', course_id=lecture.course_id) }}" class="back">← {{ lecture.course_code }}</a>
+
+  <div class="page-header" style="margin-top: 0.6rem;">
+    <h1>{{ t.lectureWord }} {{ lecture.number }}: {{ lecture.title }}</h1>
+    <p class="file-info">
+      📄 {{ lecture.original_filename or (t.lectureWord ~ " " ~ lecture.number ~ ".pdf") }}
+      {% if lecture.uploaded_at %} · {{ t.uploadedOn }} {{ lecture.uploaded_at }}{% endif %}
+    </p>
+  </div>
+
+  {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+  {% if message %}<div class="alert alert-success">✓ {{ message }}</div>{% endif %}
+
+  {% if not summary %}
+    {# ===================== Nothing generated yet (or it failed) ===================== #}
+    <section class="card" style="text-align: center;">
+      {% if lecture.ai_error and not error %}
+        <div class="alert alert-error" style="text-align: left;">{{ lecture.ai_error }}</div>
+      {% endif %}
+      <p style="margin-bottom: 1rem;">{{ t.noSummaryYet }}</p>
+      {# Generating takes 20-60 seconds: the button text changes so students know to wait #}
+      <form method="post" action="{{ url_for('generate_lecture', lecture_id=lecture.id) }}"
+            onsubmit='this.querySelector("button").disabled = true; this.querySelector("button").textContent = {{ t.generating | tojson }};'>
+        <button type="submit" class="btn">✨ {{ t.generate }}</button>
+      </form>
+    </section>
+
+  {% else %}
+    {# ===================== The two options ===================== #}
+    <nav class="tabs">
+      <a href="{{ url_for('lecture_page', lecture_id=lecture.id) }}"
+         class="tab {{ 'active' if tab == 'summary' }}">📘 {{ t.summaryTab }}</a>
+      <a href="{{ url_for('lecture_page', lecture_id=lecture.id, tab='flashcards') }}"
+         class="tab {{ 'active' if tab == 'flashcards' }}">🃏 {{ t.flashcardsTab }} ({{ cards | length }})</a>
+    </nav>
+
+    {% if tab == 'summary' %}
+      {# ---------- Option 1: Summary ---------- #}
+      <section class="card">
+        <h2>{{ t.keyConcepts }}</h2>
+        <div class="ai-text">{{ summary.key_concepts }}</div>
+      </section>
+      <section class="card">
+        <h2>{{ t.inDepthExplanation }}</h2>
+        <div class="ai-text">{{ summary.explanation }}</div>
+      </section>
+      <section class="card">
+        {# Examples are invented by the AI, so they're labelled #}
+        <h2>{{ t.realLifeExamples }} <span class="ai-tag">{{ t.aiExample }}</span></h2>
+        <div class="ai-text">{{ summary.examples }}</div>
+      </section>
+
+      <div class="summary-actions">
+        <a href="{{ url_for('lecture_page', lecture_id=lecture.id, tab='flashcards') }}" class="btn" style="text-decoration: none;">
+          {{ t.practiseFlashcards }} →
+        </a>
+        <form method="post" action="{{ url_for('generate_lecture', lecture_id=lecture.id) }}"
+              onsubmit='if (!confirm({{ t.confirmRegenerate | tojson }})) return false; this.querySelector("button").disabled = true; this.querySelector("button").textContent = {{ t.generating | tojson }};'>
+          <button type="submit" class="btn btn-secondary">↻ {{ t.regenerate }}</button>
+        </form>
+      </div>
+
+    {% else %}
+      {# ---------- Option 2: Flashcards, one at a time ---------- #}
+      {% if not cards %}
+        <section class="card"><p class="file-info">{{ t.noFlashcards }}</p></section>
+
+      {% elif card_index < cards | length %}
+        {% set card = cards[card_index] %}
+        <section class="card flashcard">
+          <div class="card-count">{{ t.cardWord }} {{ card_index + 1 }} / {{ cards | length }}</div>
+          {# Progress through the deck #}
+          <div class="progress-wrap">
+            <div class="progress-fill" style="width: {{ (card_index / (cards | length) * 100) | round | int }}%;"></div>
+          </div>
+
+          <div class="question">{{ card.question }}</div>
+
+          {# Clicking "Show answer" reveals the answer and the two buttons (no JavaScript needed) #}
+          <details>
+            <summary class="btn btn-secondary">{{ t.showAnswer }}</summary>
+            <div class="answer">{{ card.answer }}</div>
+
+            {# Each button saves the answer and moves to the next card #}
+            <form method="post" action="{{ url_for('answer_card', card_id=card.id) }}" class="answer-buttons">
+              <input type="hidden" name="lecture_id" value="{{ lecture.id }}">
+              <input type="hidden" name="next_card" value="{{ card_index + 1 }}">
+              <button type="submit" name="result" value="known" class="btn btn-known">✓ {{ t.knewIt }}</button>
+              <button type="submit" name="result" value="missed" class="btn btn-missed">✗ {{ t.didntKnow }}</button>
+            </form>
+          </details>
+
+          {# Fix a bad AI card #}
+          <details class="edit-card">
+            <summary>✎ {{ t.editCard }}</summary>
+            <form method="post" action="{{ url_for('edit_card', card_id=card.id) }}">
+              <input type="hidden" name="lecture_id" value="{{ lecture.id }}">
+              <input type="hidden" name="card" value="{{ card_index }}">
+              <label>{{ t.questionWord }}</label>
+              <textarea name="question" rows="2" required>{{ card.question }}</textarea>
+              <label>{{ t.answerWord }}</label>
+              <textarea name="answer" rows="3" required>{{ card.answer }}</textarea>
+              <button type="submit" class="btn">{{ t.save }}</button>
+            </form>
+          </details>
+        </section>
+
+      {% else %}
+        {# Past the last card: done screen #}
+        <section class="card flashcard">
+          <div class="question">🎉 {{ t.deckDone }}</div>
+          {# Count mastered cards: known more often than missed (same rule as readiness) #}
+          {% set ns = namespace(mastered=0) %}
+          {% for c in cards %}{% if c.times_known > c.times_missed %}{% set ns.mastered = ns.mastered + 1 %}{% endif %}{% endfor %}
+          <p class="file-info" style="margin-bottom: 1.25rem;">{{ t.masteredCount }} {{ ns.mastered }} / {{ cards | length }}</p>
+          <a href="{{ url_for('lecture_page', lecture_id=lecture.id, tab='flashcards') }}" class="btn" style="text-decoration: none;">↻ {{ t.reviewAgain }}</a>
+        </section>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {# Previous / next lecture in the same course (None = no button) #}
+  <nav class="pager">
+    <div>
+      {% if previous %}
+        <a href="{{ url_for('lecture_page', lecture_id=previous.id, tab=tab) }}" class="btn btn-secondary">← {{ t.lectureWord }} {{ previous.number }}</a>
+      {% endif %}
+    </div>
+    <div>
+      {% if following %}
+        <a href="{{ url_for('lecture_page', lecture_id=following.id, tab=tab) }}" class="btn btn-secondary">{{ t.lectureWord }} {{ following.number }} →</a>
+      {% endif %}
+    </div>
+  </nav>
+{% endblock %}

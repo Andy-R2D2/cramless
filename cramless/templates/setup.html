@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Cramless — Study Setup{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Study Setup</h1>
+    <p>Configure your exam dates, weekly class timetable, and daily study targets.</p>
+</div>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if warning %}<div class="alert alert-warning">{{ warning }}</div>{% endif %}
+{% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+
+<div class="grid-2">
+    <!-- Exams section -->
+    <section class="card">
+        <h2>Exams (Midterms & Finals)</h2>
+        <form method="POST" action="{{ url_for('setup') }}" class="form-row">
+            <input type="hidden" name="action" value="add_exam">
+            <select name="course_id" required>
+                {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="kind">
+                <option value="midterm">Midterm</option>
+                <option value="final">Final</option>
+            </select>
+            <input type="date" name="exam_date" required>
+            <label style="font-size: 0.9rem;">
+                <input type="checkbox" name="is_tentative" checked> Tentative
+            </label>
+            <button type="submit" class="btn">Add</button>
+        </form>
+
+        <ul class="item-list">
+            {% for exam in exams %}
+            <li>
+                <div>
+                    <strong>{{ exam.course_code }}</strong> · {{ exam.kind|capitalize }}
+                    {% if exam.is_tentative %}
+                        <span class="badge badge-warn">Tentative</span>
+                    {% else %}
+                        <span class="badge">Confirmed</span>
+                    {% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('setup') }}" class="form-row" style="margin:0;">
+                    <input type="hidden" name="action" value="update_exam">
+                    <input type="hidden" name="exam_id" value="{{ exam.id }}">
+                    <input type="date" name="new_date" value="{{ exam.exam_date }}" required>
+                    <label style="font-size: 0.85rem;">
+                        <input type="checkbox" name="is_tentative" {% if exam.is_tentative %}checked{% endif %}>
+                        Tent.
+                    </label>
+                    <button type="submit" class="btn btn-secondary">Update</button>
+                </form>
+            </li>
+            {% else %}
+            <li style="color: var(--muted);">No exams added yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <!-- Weekly timetable section -->
+    <section class="card">
+        <h2>Weekly Class Timetable</h2>
+        <form method="POST" action="{{ url_for('setup') }}" class="form-row">
+            <input type="hidden" name="action" value="add_class">
+            <select name="course_id" required>
+                {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.code }}</option>
+                {% endfor %}
+            </select>
+            <select name="weekday">
+                <option value="0">Monday</option>
+                <option value="1">Tuesday</option>
+                <option value="2">Wednesday</option>
+                <option value="3">Thursday</option>
+                <option value="4">Friday</option>
+                <option value="5">Saturday</option>
+                <option value="6">Sunday</option>
+            </select>
+            <input type="time" name="start_time" required>
+            <span>to</span>
+            <input type="time" name="end_time" required>
+            <button type="submit" class="btn">Add</button>
+        </form>
+
+        <ul class="item-list">
+            {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+            {% for item in timetable %}
+            <li>
+                <span><strong>{{ days[item.weekday] }}</strong> · {{ item.course_code }}</span>
+                <span class="badge">{{ item.start_time }} – {{ item.end_time }}</span>
+            </li>
+            {% else %}
+            <li style="color: var(--muted);">No classes scheduled yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
+
+<!-- Daily study goals section -->
+<section class="card">
+    <h2>Daily Study Goals & Reminders</h2>
+    {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+    {% for d in range(7) %}
+        {% set goal = goals.get(d, {'hours': 0, 'reminder_time': ''}) %}
+        <form method="POST" action="{{ url_for('setup') }}" class="goal-row">
+            <input type="hidden" name="action" value="set_goal">
+            <input type="hidden" name="weekday" value="{{ d }}">
+            <strong>{{ days[d] }}</strong>
+            <div>
+                <input type="number" step="0.5" min="0" max="16" name="hours" value="{{ goal.hours }}" style="width: 85px;" required>
+                <span style="color: var(--muted); font-size: 0.9rem;">hrs</span>
+            </div>
+            <div>
+                <span style="color: var(--muted); font-size: 0.85rem;">Reminder:</span>
+                <input type="time" name="reminder_time" value="{{ goal.reminder_time or '' }}">
+            </div>
+            <button type="submit" class="btn btn-secondary">Save</button>
+        </form>
+    {% endfor %}
+</section>
+{% endblock %}
