@@ -13,6 +13,7 @@ import random
 
 from flask import Flask, redirect, render_template, request, session, url_for
 
+import ai_generator
 import auth
 import courses
 import planner
@@ -107,6 +108,31 @@ TRANSLATIONS = {
         "pdfOnly": "PDF only, up to",
         "upload": "Upload",
         "summaryComingSoon": "The summary and flashcards for this lecture will appear here.",
+        # --- Summary + flashcards (issue #5) ---
+        "summaryFailed": "Summary failed",
+        "noSummaryYet": "No summary or flashcards for this lecture yet.",
+        "generate": "Generate summary and flashcards",
+        "generating": "Generating... (up to a minute)",
+        "summaryTab": "Summary",
+        "flashcardsTab": "Flashcards",
+        "keyConcepts": "Key concepts",
+        "inDepthExplanation": "In-depth explanation",
+        "realLifeExamples": "Real-life examples",
+        "aiExample": "AI example",
+        "practiseFlashcards": "Practise with flashcards",
+        "regenerate": "Regenerate",
+        "confirmRegenerate": "Make a new summary and flashcards? Your current ones (and your progress on them) will be replaced.",
+        "noFlashcards": "No flashcards for this lecture.",
+        "cardWord": "Card",
+        "showAnswer": "Show answer",
+        "knewIt": "Knew it",
+        "didntKnow": "Didn't know",
+        "editCard": "Edit card",
+        "questionWord": "Question",
+        "answerWord": "Answer",
+        "deckDone": "You've gone through all the cards!",
+        "masteredCount": "Cards you know:",
+        "reviewAgain": "Review again",
     },
     "fr": {
         # --- Accueil, connexion, inscription (Meron) ---
@@ -179,6 +205,31 @@ TRANSLATIONS = {
         "pdfOnly": "PDF seulement, jusqu'à",
         "upload": "Téléverser",
         "summaryComingSoon": "Le résumé et les cartes mémoire de ce cours apparaîtront ici.",
+        # --- Résumé + cartes mémoire (issue #5) ---
+        "summaryFailed": "Échec du résumé",
+        "noSummaryYet": "Pas encore de résumé ni de cartes mémoire pour ce cours.",
+        "generate": "Générer le résumé et les cartes mémoire",
+        "generating": "Génération en cours... (jusqu'à une minute)",
+        "summaryTab": "Résumé",
+        "flashcardsTab": "Cartes mémoire",
+        "keyConcepts": "Concepts clés",
+        "inDepthExplanation": "Explication détaillée",
+        "realLifeExamples": "Exemples concrets",
+        "aiExample": "Exemple IA",
+        "practiseFlashcards": "S'entraîner avec les cartes",
+        "regenerate": "Régénérer",
+        "confirmRegenerate": "Créer un nouveau résumé et de nouvelles cartes ? Les actuels (et votre progression) seront remplacés.",
+        "noFlashcards": "Aucune carte mémoire pour ce cours.",
+        "cardWord": "Carte",
+        "showAnswer": "Voir la réponse",
+        "knewIt": "Je savais",
+        "didntKnow": "Je ne savais pas",
+        "editCard": "Modifier la carte",
+        "questionWord": "Question",
+        "answerWord": "Réponse",
+        "deckDone": "Vous avez vu toutes les cartes !",
+        "masteredCount": "Cartes maîtrisées :",
+        "reviewAgain": "Revoir",
     },
 }
 
@@ -482,21 +533,89 @@ def upload_lecture(course_id):
     )
     if error:
         return redirect(url_for("course_page", course_id=course_id, error=error))
-    return redirect(url_for("course_page", course_id=course_id, message="Lecture uploaded."))
+
+    # Make the summary + flashcards right away, in the student's language (takes 20-60 s).
+    # If it fails, the lecture is still saved and the lecture page shows the error + a retry button.
+    ok, ai_error = ai_generator.generate_for_lecture(lecture_id, session.get("language", "en"))
+    if not ok:
+        return redirect(url_for("lecture_page", lecture_id=lecture_id,
+                                error=f"Lecture uploaded, but the summary couldn't be generated: {ai_error}"))
+    return redirect(url_for("lecture_page", lecture_id=lecture_id, message="Lecture uploaded. Summary and flashcards ready!"))
 
 
 @app.route("/lecture/<int:lecture_id>")
 def lecture_page(lecture_id):
-    """Lecture page with previous / next buttons.
-    Phase 4 adds the AI summary and flashcards here."""
+    """Lecture page (issue #5): two options, Summary or Flashcards, + previous / next.
+    ?tab=summary (default) or ?tab=flashcards, and ?card=N for the flashcard being shown."""
     user_id = current_user_id()
     if not user_id:
         return redirect(url_for("login"))
     lecture = courses.get_lecture(user_id, lecture_id)
     if lecture is None:
         return redirect(url_for("dashboard"))
+
+    summary = courses.get_summary(lecture_id)
+    cards = courses.get_flashcards(lecture_id)
+    if summary:
+        courses.mark_lecture_reviewed(lecture_id)  # studying it counts for readiness "coverage"
+
+    tab = "flashcards" if request.args.get("tab") == "flashcards" else "summary"
+    # Which card to show (0 = first). Past the last card = the "done" screen.
+    card_index = max(0, request.args.get("card", default=0, type=int))
     previous, following = courses.get_previous_and_next(lecture_id)
-    return render_template("lecture.html", lecture=lecture, previous=previous, following=following)
+    return render_template(
+        "lecture.html",
+        lecture=lecture, summary=summary, cards=cards,
+        tab=tab, card_index=card_index,
+        previous=previous, following=following,
+        error=request.args.get("error"), message=request.args.get("message"),
+    )
+
+
+@app.route("/lecture/<int:lecture_id>/generate", methods=["POST"])
+def generate_lecture(lecture_id):
+    """'Generate' / 'Regenerate' button: run the AI pipeline for this lecture."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    if courses.get_lecture(user_id, lecture_id) is None:
+        return redirect(url_for("dashboard"))
+    ok, error = ai_generator.generate_for_lecture(lecture_id, session.get("language", "en"))
+    if not ok:
+        return redirect(url_for("lecture_page", lecture_id=lecture_id, error=error))
+    return redirect(url_for("lecture_page", lecture_id=lecture_id, message="Summary and flashcards generated."))
+
+
+@app.route("/flashcard/<int:card_id>/answer", methods=["POST"])
+def answer_card(card_id):
+    """'Knew it' / 'Didn't know' buttons: save the answer, then show the next card."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    courses.record_answer(user_id, card_id, request.form.get("result") == "known")
+    return redirect(url_for(
+        "lecture_page",
+        lecture_id=request.form.get("lecture_id", type=int),
+        tab="flashcards",
+        card=request.form.get("next_card", default=0, type=int),
+    ))
+
+
+@app.route("/flashcard/<int:card_id>/edit", methods=["POST"])
+def edit_card(card_id):
+    """Fix a bad AI card (the "Edit card" form under each flashcard)."""
+    user_id = current_user_id()
+    if not user_id:
+        return redirect(url_for("login"))
+    error = courses.edit_flashcard(user_id, card_id, request.form.get("question"), request.form.get("answer"))
+    return redirect(url_for(
+        "lecture_page",
+        lecture_id=request.form.get("lecture_id", type=int),
+        tab="flashcards",
+        card=request.form.get("card", default=0, type=int),
+        error=error,
+        message=None if error else "Flashcard updated.",
+    ))
 
 
 @app.route("/lecture/<int:lecture_id>/delete", methods=["POST"])

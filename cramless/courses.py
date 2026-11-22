@@ -160,8 +160,7 @@ def save_lecture(user_id, course_id, number, title, uploaded_file):
     Check an uploaded PDF, save it in uploads/ and add the lecture to the database.
     `uploaded_file` is request.files["pdf"] from Flask.
     Returns (lecture_id, error): lecture_id is None and error explains why if it failed.
-
-    TODO (Role 2, phase 4): after saving, call ai_generator.generate_for_lecture(lecture_id)
+    (app.py then calls ai_generator.generate_for_lecture() to make the summary + flashcards.)
     """
     # 1. The course must exist and belong to this student
     if not get_course(user_id, course_id):
@@ -310,42 +309,75 @@ def delete_lecture(user_id, lecture_id):
 
 
 def get_summary(lecture_id):
-    """TODO (Role 2, phase 4): return the summary row for a lecture (or None)."""
-    return None
+    """The lecture's AI summary (key_concepts, explanation, examples), or None."""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM summaries WHERE lecture_id = ?", (lecture_id,)).fetchone()
+    conn.close()
+    return row
 
 
 def mark_lecture_reviewed(lecture_id):
-    """TODO (Role 2, phase 4): set reviewed = 1 (Role 4 uses this for the 'coverage' score)."""
-    pass
-
-
-# ---------------------------------------------------------------------------
-# Flashcards
-# ---------------------------------------------------------------------------
-
-def get_flashcards(lecture_id):
-    """TODO (Role 2): return the lecture's flashcards (up to 10)."""
-    return []
-
-
-def record_answer(card_id, knew_it):
-    """
-    Called when the student clicks "knew it" (knew_it=True) or "didn't know".
-    Updates the counters and the review date (Role 4 reads these for readiness).
-    """
-    column = "times_known" if knew_it else "times_missed"
+    """Set reviewed = 1 when the student studies the lecture (readiness 'coverage' uses it)."""
     conn = get_connection()
-    conn.execute(
-        f"UPDATE flashcards SET {column} = {column} + 1, last_reviewed = ? WHERE id = ?",
-        (date.today().isoformat(), card_id),
-    )
+    conn.execute("UPDATE lectures SET reviewed = 1 WHERE id = ?", (lecture_id,))
     conn.commit()
     conn.close()
 
 
-def edit_flashcard(card_id, question, answer):
-    """TODO (Role 2): let the student fix a bad AI card."""
-    pass
+# ---------------------------------------------------------------------------
+# Flashcards — issue #5
+# ---------------------------------------------------------------------------
+
+def get_flashcards(lecture_id):
+    """The lecture's flashcards (up to 10), in the order they were generated."""
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM flashcards WHERE lecture_id = ? ORDER BY id", (lecture_id,)).fetchall()
+    conn.close()
+    return rows
+
+
+def _card_owner_check(conn, user_id, card_id):
+    """True if this flashcard belongs to one of the student's courses."""
+    row = conn.execute(
+        """SELECT 1 FROM flashcards f
+           JOIN lectures l ON f.lecture_id = l.id
+           JOIN courses c ON l.course_id = c.id
+           WHERE f.id = ? AND c.user_id = ?""",
+        (card_id, user_id),
+    ).fetchone()
+    return row is not None
+
+
+def record_answer(user_id, card_id, knew_it):
+    """
+    Called when the student clicks "Knew it" (knew_it=True) or "Didn't know".
+    Updates the counters and the review date (Role 4 reads these for readiness).
+    """
+    column = "times_known" if knew_it else "times_missed"  # only these two values, never user text
+    conn = get_connection()
+    if _card_owner_check(conn, user_id, card_id):
+        conn.execute(
+            f"UPDATE flashcards SET {column} = {column} + 1, last_reviewed = ? WHERE id = ?",
+            (date.today().isoformat(), card_id),
+        )
+        conn.commit()
+    conn.close()
+
+
+def edit_flashcard(user_id, card_id, question, answer):
+    """Let the student fix a bad AI card. Returns an error message, or None if it worked."""
+    question = (question or "").strip()
+    answer = (answer or "").strip()
+    if not question or not answer:
+        return "A flashcard needs both a question and an answer."
+    conn = get_connection()
+    if not _card_owner_check(conn, user_id, card_id):
+        conn.close()
+        return "Flashcard not found."
+    conn.execute("UPDATE flashcards SET question = ?, answer = ? WHERE id = ?", (question, answer, card_id))
+    conn.commit()
+    conn.close()
+    return None
 
 
 # ---------------------------------------------------------------------------

@@ -53,7 +53,8 @@ def create_tables():
             pdf_path  TEXT NOT NULL,              -- file saved in the uploads/ folder
             reviewed  INTEGER DEFAULT 0,          -- 1 once the student opened it (readiness)
             original_filename TEXT,               -- name of the file the student uploaded (shown on the course page)
-            uploaded_at       TEXT                -- 'YYYY-MM-DD'
+            uploaded_at       TEXT,               -- 'YYYY-MM-DD'
+            ai_error          TEXT                -- why the AI summary failed (NULL = no error)
         );
 
         CREATE TABLE IF NOT EXISTS summaries (
@@ -124,7 +125,7 @@ def _add_missing_columns(conn):
     """
     new_columns = {
         # table: [(column, type), ...]
-        "lectures": [("original_filename", "TEXT"), ("uploaded_at", "TEXT")],
+        "lectures": [("original_filename", "TEXT"), ("uploaded_at", "TEXT"), ("ai_error", "TEXT")],
     }
     for table, columns in new_columns.items():
         existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}

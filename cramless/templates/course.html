@@ -84,6 +84,9 @@
             {# Status: ready once phase 4 has generated the summary and flashcards #}
             {% if lec.has_summary %}
               <span class="badge status-ready">✓ {{ t.summaryReady }} · {{ lec.card_count }} {{ t.flashcardsWord }}</span>
+            {% elif lec.ai_error %}
+              {# Generation failed: the lecture page explains why and has a retry button #}
+              <span class="badge" style="background: var(--danger-bg); color: var(--danger-text);">⚠ {{ t.summaryFailed }}</span>
             {% else %}
               <span class="badge status-waiting">{{ t.summaryPending }}</span>
             {% endif %}
