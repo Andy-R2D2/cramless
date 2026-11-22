@@ -116,7 +116,11 @@
       </ul>
     </section>
     {% endif %}
-
+    {% if reminder %}
+      <section class="card" role="status" style="border-left: 5px solid #e67e22;">
+        <strong>&#9200; {{ reminder }}</strong>
+      </section>
+    {% endif %}
     <!-- ===================== 2. Today's goal ===================== -->
     <section class="card">
       <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -219,4 +223,29 @@
 
   </div>
 
+{% endblock %}
+
+{% block scripts %}
+{% if reminder %}
+<script>
+  // Browser notification for the study reminder (#15)
+  // Asks permission once, shows at most once per browser tab. The banner shows either way.
+  const reminderMessage = {{ reminder | tojson }};
+  let alreadyShown = false;
+  try { alreadyShown = sessionStorage.getItem("cramlessReminder") === reminderMessage; } catch (e) {}
+
+  function showReminder(){
+    new Notification("Cramless", { body: reminderMessage });
+    try{ sessionStorage.setItem("cramlessReminder", reminderMessage); } catch (e) {}
+  }
+
+  if (!alreadyShown && "Notification" in window){
+    if (Notification.permission === "granted"){
+      showReminder();
+    } else if (Notification.permission !== "denied"){
+      Notification.requestPermission().then(function (p) { if (p === "granted") showReminder(); })
+    }
+  }
+</script>
+{% endif %}
 {% endblock %}

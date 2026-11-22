@@ -17,6 +17,7 @@ import auth
 import courses
 import planner
 import readiness
+import reminders
 from database import create_tables
 
 app = Flask(__name__)
@@ -291,6 +292,7 @@ def dashboard():
         minutes_done=planner.minutes_studied_today(user_id),
         goal_minutes=planner.todays_goal_minutes(user_id),
         tip=random.choice(TIPS),
+        reminder=reminders.reminder_for(user_id),
     )
 
 
