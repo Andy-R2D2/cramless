@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Cramless — Today's Plan & Timer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Today's Study Plan</h1>
+    <p>Your daily study goal is split by exam proximity, unreviewed lectures, and readiness.</p>
+</div>
+
+{% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+
+<!-- Daily progress bar -->
+<section class="card">
+    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <h2 style="margin: 0;">Today's Progress</h2>
+        <strong>{{ minutes_done }} / {{ goal_minutes }} mins</strong>
+    </div>
+    {% set pct = ((minutes_done / goal_minutes * 100) if goal_minutes > 0 else 0) | round | int %}
+    {% set capped_pct = 100 if pct > 100 else pct %}
+    <div class="progress-wrap">
+        <div class="progress-fill" style="width: {{ capped_pct }}%;"></div>
+    </div>
+    <p style="font-size: 0.88rem; color: var(--muted);">{{ pct }}% of today's goal completed</p>
+</section>
+
+<!-- Rule-based plan breakdown -->
+<section class="card">
+    <h2>Recommended Breakdown</h2>
+    {% if daily_plan %}
+        <ul class="item-list">
+            {% for item in daily_plan %}
+            <li>
+                <div>
+                    <strong style="font-size: 1.05rem;">{{ item.course_code }}</strong>
+                    {% if item.lectures %}
+                        <div style="font-size: 0.9rem; color: var(--muted); margin-top: 2px;">
+                            Focus lectures: <strong>{{ item.lectures | join(", ") }}</strong>
+                        </div>
+                    {% else %}
+                        <div style="font-size: 0.9rem; color: var(--muted); margin-top: 2px;">
+                            No lectures uploaded yet
+                        </div>
+                    {% endif %}
+                </div>
+                <span class="badge" style="font-size: 0.9rem; padding: 0.35rem 0.8rem;">
+                    {{ item.minutes }} mins
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p style="color: var(--muted);">
+            No study goal set for today or no courses added yet. Head to <a href="{{ url_for('setup') }}">Setup</a> to configure your weekday goals.
+        </p>
+    {% endif %}
+</section>
+
+<div class="grid-2">
+    <!-- Stopwatch study timer -->
+    <section class="card">
+        <h2>Live Study Timer</h2>
+        <div class="timer-box">
+            <select id="timer-course" style="width: 100%; max-width: 280px;">
+                {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="timer-display" id="display">00:00:00</div>
+
+            <div class="timer-controls">
+                <button type="button" class="btn" onclick="startTimer()">Start</button>
+                <button type="button" class="btn btn-secondary" onclick="pauseTimer()">Pause</button>
+                <button type="button" class="btn btn-success" onclick="finishSession()">Save & Finish</button>
+            </div>
+        </div>
+
+        <form id="timer-form" method="POST" action="{{ url_for('plan') }}">
+            <input type="hidden" name="source" value="timer">
+            <input type="hidden" name="course_id" id="timer-course-input">
+            <input type="hidden" name="minutes" id="timer-minutes-input">
+        </form>
+    </section>
+
+    <!-- Manual offline study log -->
+    <section class="card">
+        <h2>Offline Study Log</h2>
+        <p style="color: var(--muted); font-size: 0.92rem; margin-bottom: 1rem;">
+            Studied away from the app? Log your session manually to keep your progress bar accurate.
+        </p>
+        <form method="POST" action="{{ url_for('plan') }}">
+            <input type="hidden" name="source" value="offline">
+            <div class="form-row">
+                <select name="course_id" style="width: 100%;" required>
+                    {% for c in courses %}
+                        <option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-row">
+                <input type="number" name="minutes" min="1" max="600" placeholder="Minutes (e.g. 60)" style="flex: 1;" required>
+                <button type="submit" class="btn">Log Session</button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let seconds = 0;
+    let interval = null;
+
+    function formatTime(sec) {
+        const hrs = String(Math.floor(sec / 3600)).padStart(2, '0');
+        const mins = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+        const secs = String(sec % 60).padStart(2, '0');
+        return `${hrs}:${mins}:${secs}`;
+    }
+
+    function startTimer() {
+        if (interval) return;
+        interval = setInterval(() => {
+            seconds++;
+            document.getElementById("display").textContent = formatTime(seconds);
+        }, 1000);
+    }
+
+    function pauseTimer() {
+        clearInterval(interval);
+        interval = null;
+    }
+
+    function finishSession() {
+        pauseTimer();
+        const mins = Math.max(1, Math.round(seconds / 60));
+        const courseSelect = document.getElementById("timer-course");
+        if (!courseSelect.value) {
+            alert("Please add a course first.");
+            return;
+        }
+        document.getElementById("timer-course-input").value = courseSelect.value;
+        document.getElementById("timer-minutes-input").value = mins;
+        document.getElementById("timer-form").submit();
+    }
+</script>
+{% endblock %}
