@@ -55,6 +55,7 @@ TRANSLATIONS = {
         "signIn": "Sign In",
         "signUp": "Sign Up",
         "dashboard": "Dashboard",
+        "tips": "Tip",
         # --- Dashboard (issue #2) ---
         "welcomeBack": "Welcome back!",
         "dashboardIntro": "Here's your study overview for today.",
@@ -156,6 +157,7 @@ TRANSLATIONS = {
         "signIn": "Se Connecter",
         "signUp": "S'inscrire",
         "dashboard": "Tableau de bord",
+        "tips": "Pourboires",
         # --- Tableau de bord (issue #2) ---
         "welcomeBack": "Bon retour !",
         "dashboardIntro": "Voici votre aperçu d'étude pour aujourd'hui.",
@@ -243,11 +245,20 @@ TRANSLATIONS = {
 }
 
 # Rule-based tips for the homepage (functionality #1)
-TIPS = [
-    "Short daily sessions beat one long cram the night before.",
-    "Review yesterday's flashcards before starting a new lecture.",
-    "Start with the course whose exam is closest.",
-]
+TIPS = {
+    "en": [
+        "Short daily sessions beat one long cram the night before.",
+        "Review yesterday's flashcards before starting a new lecture.",
+        "Start with the course whose exam is closest."
+    ],
+
+    "fr": [
+        "De courtes séances quotidiennes valent mieux qu’une longue séance de bachotage la veille.",
+        "Révisez les cartes-mémoire d’hier avant de commencer un nouveau cours.",
+        "Commencez par le cours dont l’examen est le plus proche."
+    ]
+}
+    
 
 
 @app.context_processor
@@ -282,7 +293,8 @@ def current_user_id():
 @app.route("/")
 def home():
     """Homepage with a sample readiness score and a random tip (#1)."""
-    return render_template("home.html", sample_score=72, tip=random.choice(TIPS))
+    lang = session.get("language", "en")
+    return render_template("home.html", sample_score=72, tip=random.choice(TIPS[lang]))
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -343,6 +355,8 @@ def dashboard():
     if not user_id:
         return redirect(url_for("login"))
 
+    lang = session.get("language", "en")
+
     # Readiness scores keyed by course code, so each course box can find its own score
     score_by_code = {s["course_code"]: s for s in readiness.all_scores(user_id)}
 
@@ -354,7 +368,7 @@ def dashboard():
         plan=planner.build_daily_plan(user_id),
         minutes_done=planner.minutes_studied_today(user_id),
         goal_minutes=planner.todays_goal_minutes(user_id),
-        tip=random.choice(TIPS),
+        tip=random.choice(TIPS[lang]),
         reminder=reminders.reminder_for(user_id),
     )
 

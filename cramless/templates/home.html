@@ -14,7 +14,7 @@
     <p style="font-size: 0.92rem; margin-bottom: 1.5rem;">{{ t.sampleReadiness }}: {{ sample_score }}/100</p>
 
     <div class="alert alert-info" style="max-width: 540px; margin: 0 auto 1.5rem auto;">
-        <strong>Tip:</strong> {{ tip }}
+        <strong>{{ t.tips }}:</strong> {{ tip }}
     </div>
 
     {% if not session.get('user_id') %}
