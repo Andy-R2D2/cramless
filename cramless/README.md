@@ -106,6 +106,14 @@ Open http://127.0.0.1:5000.
 
 > ⚠️ **Never commit `.env`** (it holds the OpenAI key). It's already in `.gitignore`.
 
+
+---
+## DEMO
+---
+- [ ] Cramless Demonstration: [Demo Video](https://drive.google.com/drive/u/0/folders/1Q08_Qq6nBzLON6WaNI0lvwsGfpBVI_O2)
+
+
+
 ---
 
 ## 📁 Project structure
