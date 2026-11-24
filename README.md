@@ -19,7 +19,7 @@ There are 4 of us, so the project is split into **4 roles**. Each role owns its 
 | **1. Website, accounts, dashboard & EN/FR** | `app.py`, `auth.py`, `templates/`, `static/` | Meron |
 | **2. Courses, lectures & AI** | `courses.py`, `ai_generator.py` | Andy |
 | **3. Planner: exams, timetable, goals, daily plan, timer** | `planner.py` | Teni|
-| **4. Readiness score & reminders** | `readiness.py` | _your name_ |
+| **4. Readiness score & reminders** | `readiness.py` | Raihan |
 
 `database.py` is **shared**: all the tables are already there. If you need a new column, tell the team first.
 
@@ -105,6 +105,13 @@ python app.py
 Open http://127.0.0.1:5000.
 
 > ⚠️ **Never commit `.env`** (it holds the OpenAI key). It's already in `.gitignore`.
+
+
+---
+## DEMO
+- [ ] Cramless Demonstration: [Demo Video](https://drive.google.com/drive/u/0/folders/1Q08_Qq6nBzLON6WaNI0lvwsGfpBVI_O2)
+---
+
 
 ---
 
